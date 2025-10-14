@@ -14,7 +14,9 @@ const cbMirror = document.getElementById('cbMirror'); // now unchecked by defaul
 
 // Pad layout in sheet coordinates
 const SHEET_W = 384, SHEET_H = 288;
-const pads = [
+
+// Base pad positions as defined for the printable PDF
+const basePads = [
   { name: "Kick",    x:  64, y:  64, r: 34, sound: "sounds/kick.wav" },
   { name: "Snare",   x: 192, y:  64, r: 34, sound: "sounds/snare.wav" },
   { name: "HiHat C", x: 320, y:  64, r: 30, sound: "sounds/hihat_closed.wav" },
@@ -22,6 +24,12 @@ const pads = [
   { name: "Clap",    x: 192, y: 180, r: 32, sound: "sounds/clap.wav" },
   { name: "HiHat O", x: 320, y: 180, r: 30, sound: "sounds/hihat_open.wav" },
 ];
+
+// Use this for drawing and hit-tests: invert Y once for screen coords
+function padsForScreen() {
+  return basePads.map(p => ({ ...p, y: (SHEET_H - p.y) }));
+}
+
 
 let audioCtx;
 const samples = new Map();
@@ -133,6 +141,7 @@ function overlayPxToSheet(px, py) {
 function renderOverlay(tipPx) {
   ctx.clearRect(0, 0, overlay.width, overlay.height);
 
+  const pads = padsForScreen();
   const sx = overlay.width / SHEET_W;
   const sy = overlay.height / SHEET_H;
   ctx.lineWidth = 2;
@@ -180,6 +189,7 @@ async function loop(ts) {
       v = Math.hypot(dx, dy) / dt;
     }
     if (v > VELOCITY_THRESH) {
+      const pads = padsForScreen();
       for (const p of pads) {
         const d = Math.hypot(tipSheet.x - p.x, tipSheet.y - p.y);
         if (d <= p.r) {
