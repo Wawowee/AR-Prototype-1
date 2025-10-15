@@ -36,7 +36,7 @@ const basePads = [
   { name: "HiHat O", x: 320, y: 180, r: 30, sound: "sounds/hihat_open.wav" },
 ];
 
-// --- DEBUG PROBE ---
+/* --- DEBUG PROBE ---
 const octx = overlay?.getContext?.('2d');
 
 function debugProbeTick(ts=0){
@@ -51,7 +51,7 @@ function debugProbeTick(ts=0){
   octx.fillText('probe ' + (ts|0), 18, 30);     // moving timestamp
   requestAnimationFrame(debugProbeTick);
 }
-requestAnimationFrame(debugProbeTick);
+requestAnimationFrame(debugProbeTick); */
 
 // Use this for all rendering & hit tests: invert Y once to match screen (top-left origin)
 function padsForScreen() {
