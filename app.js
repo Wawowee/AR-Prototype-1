@@ -53,6 +53,18 @@ function debugProbeTick(ts=0){
 }
 requestAnimationFrame(debugProbeTick); */
 
+function syncOverlaySizeToVideo() {
+  const v = document.getElementById('video');
+  const c = document.getElementById('overlay');
+  if (!v || !c) return;
+  // Use the video’s *intrinsic* pixel size for crisp rendering
+  c.width  = v.videoWidth  || v.clientWidth  || 640;
+  c.height = v.videoHeight || v.clientHeight || 480;
+}
+video.addEventListener('loadedmetadata', syncOverlaySizeToVideo);
+window.addEventListener('resize', syncOverlaySizeToVideo);
+
+
 // Use this for all rendering & hit tests: invert Y once to match screen (top-left origin)
 function padsForScreen() {
   return basePads.map(p => ({ ...p, y: (SHEET_H - p.y) }));
