@@ -2,6 +2,19 @@
 
 import { FilesetResolver, HandLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0";
 
+let cvReady = false;
+if (window.cv && typeof cv === 'object') {
+  cv.onRuntimeInitialized = () => {
+    cvReady = true;
+    console.log('OpenCV ready');
+  };
+}
+function requireCV() {
+  if (!cvReady) { console.warn('OpenCV not ready'); return false; }
+  return true;
+}
+
+
 const video = document.getElementById('video');
 const overlay = document.getElementById('overlay');
 const ctx = overlay.getContext('2d');
