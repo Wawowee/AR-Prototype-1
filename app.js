@@ -122,8 +122,6 @@ async function initCamera() {
   resizeCanvas();
 }
 
-window.startCamera = startCamera;
-window.onCalibrateClick = onCalibrateClick;
 
 async function initHands() {
   const filesetResolver = await FilesetResolver.forVisionTasks(
