@@ -23,6 +23,41 @@ const basePads = [
   { name: "Clap",    x: 192, y: 180, r: 32, sound: "sounds/clap.wav" },
   { name: "HiHat O", x: 320, y: 180, r: 30, sound: "sounds/hihat_open.wav" },
 ];
+// OpenCV start
+// --- OpenCV lazy loader (no <script> tag in HTML needed) ---
+let cvReady = false;
+let cvLoadPromise = null;
+export async function loadOpenCVOnce() {
+  if (cvReady) return;
+  if (!cvLoadPromise) {
+    cvLoadPromise = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://docs.opencv.org/4.x/opencv.js';
+      s.async = true;              // okay here; we'll wait on onRuntimeInitialized
+      s.onload = () => {
+        if (window.cv) {
+          if (typeof cv.onRuntimeInitialized === 'function') {
+            cv.onRuntimeInitialized = () => { cvReady = true; resolve(); };
+          } else {
+            // Some builds are already initialized
+            cvReady = true; resolve();
+          }
+        } else {
+          reject(new Error('OpenCV global not found after load'));
+        }
+      };
+      s.onerror = (e) => reject(e);
+      document.head.appendChild(s);
+    });
+  }
+  return cvLoadPromise;
+}
+// Hidden canvas just for CV processing (not added to DOM)
+const work = document.createElement('canvas');
+work.width = 480;  // you can try 640x480 later if corners are small
+work.height = 360;
+const wctx = work.getContext('2d', { willReadFrequently: true });
+// Open CV End
 
 
 function syncOverlaySizeToVideo() {
