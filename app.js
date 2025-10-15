@@ -37,7 +37,6 @@ const basePads = [
 ];
 
 // --- DEBUG PROBE ---
-const overlay = document.getElementById('overlayCanvas');
 const octx = overlay?.getContext?.('2d');
 
 function debugProbeTick(ts=0){
