@@ -254,9 +254,26 @@ btnCam.onclick = async () => {
   requestAnimationFrame(loop);
 };
 
-btnCal.onclick = () => {
-  statusEl.textContent = "Calibration set (identity). Keep phone square to the paper.";
+// Calibration verification message and check
+btnCal.onclick = async () => {
+  statusEl.textContent = "Calibrating...";
+  try {
+    await loadOpenCVOnce(); // lazy load; no-op after first time
+    const ok = findSquaresAndHomographyFromCurrentFrame(video);
+    statusEl.textContent = ok ? "Calibrated" : "Calibration failed";
+    // visual breadcrumb on overlay
+    const g = overlay.getContext('2d');
+    g.save();
+    g.strokeStyle = ok ? "#00ff66" : "#ff3355";
+    g.lineWidth = 4;
+    g.strokeRect(8,8, overlay.width-16, overlay.height-16);
+    g.restore();
+  } catch (e) {
+    console.error("Calibration error", e);
+    statusEl.textContent = "Calibration error (see console)";
+  }
 };
+
 
 // --- Video → overlay mapping (accounts for object-fit: cover) ---
 function getCoverMapping(overlayW, overlayH, videoW, videoH) {
