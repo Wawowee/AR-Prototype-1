@@ -59,6 +59,25 @@ function resizeCanvas() {
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 
+// --- DEBUG PROBE ---
+const overlay = document.getElementById('overlayCanvas');
+const octx = overlay?.getContext?.('2d');
+
+function debugProbeTick(ts=0){
+  if (!overlay || !octx) return;
+  const w = overlay.width, h = overlay.height;
+  octx.clearRect(0,0,w,h);
+  octx.lineWidth = 3;
+  octx.strokeStyle = '#00FF88';
+  octx.strokeRect(10,10, w-20, h-20);           // big frame
+  octx.fillStyle = '#00FF88';
+  octx.font = '16px monospace';
+  octx.fillText('probe ' + (ts|0), 18, 30);     // moving timestamp
+  requestAnimationFrame(debugProbeTick);
+}
+requestAnimationFrame(debugProbeTick);
+
+
 async function initAudio() {
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   for (const p of basePads) {
