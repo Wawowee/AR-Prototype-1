@@ -2,18 +2,6 @@
 
 import { FilesetResolver, HandLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0";
 
-let cvReady = false;
-if (window.cv && typeof cv === 'object') {
-  cv.onRuntimeInitialized = () => {
-    cvReady = true;
-    console.log('OpenCV ready');
-  };
-}
-function requireCV() {
-  if (!cvReady) { console.warn('OpenCV not ready'); return false; }
-  return true;
-}
-
 
 const video = document.getElementById('video');
 const overlay = document.getElementById('overlay');
@@ -36,22 +24,6 @@ const basePads = [
   { name: "HiHat O", x: 320, y: 180, r: 30, sound: "sounds/hihat_open.wav" },
 ];
 
-/* --- DEBUG PROBE ---
-const octx = overlay?.getContext?.('2d');
-
-function debugProbeTick(ts=0){
-  if (!overlay || !octx) return;
-  const w = overlay.width, h = overlay.height;
-  octx.clearRect(0,0,w,h);
-  octx.lineWidth = 3;
-  octx.strokeStyle = '#00FF88';
-  octx.strokeRect(10,10, w-20, h-20);           // big frame
-  octx.fillStyle = '#00FF88';
-  octx.font = '16px monospace';
-  octx.fillText('probe ' + (ts|0), 18, 30);     // moving timestamp
-  requestAnimationFrame(debugProbeTick);
-}
-requestAnimationFrame(debugProbeTick); */
 
 function syncOverlaySizeToVideo() {
   const v = document.getElementById('video');
