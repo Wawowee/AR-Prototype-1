@@ -25,6 +25,7 @@ const basePads = [
 ];
 // OpenCV start
 // --- OpenCV lazy loader (no <script> tag in HTML needed) ---
+// --- OpenCV lazy loader (robust wait) ---
 let cvReady = false;
 let cvLoadPromise = null;
 export async function loadOpenCVOnce() {
@@ -33,17 +34,31 @@ export async function loadOpenCVOnce() {
     cvLoadPromise = new Promise((resolve, reject) => {
       const s = document.createElement('script');
       s.src = 'https://docs.opencv.org/4.x/opencv.js';
-      s.async = true;              // okay here; we'll wait on onRuntimeInitialized
+      s.async = true;
+      s.crossOrigin = 'anonymous';
       s.onload = () => {
-        if (window.cv) {
-          if (typeof cv.onRuntimeInitialized === 'function') {
-            cv.onRuntimeInitialized = () => { cvReady = true; resolve(); };
+        const waitForAPI = () => {
+          const ok =
+            typeof window.cv === 'object' &&
+            typeof cv.Mat === 'function' &&
+            typeof cv.getPerspectiveTransform === 'function';
+          if (ok) {
+            cvReady = true;
+            resolve();
           } else {
-            // Some builds are already initialized
-            cvReady = true; resolve();
+            setTimeout(waitForAPI, 25);
           }
+        };
+        // If the build exposes onRuntimeInitialized, hook it; otherwise poll.
+        if (window.cv && typeof cv.onRuntimeInitialized === 'function') {
+          cv.onRuntimeInitialized = () => {
+            cvReady = true;
+            resolve();
+          };
+          // Also start a poll in case the callback isn't fired in this build
+          waitForAPI();
         } else {
-          reject(new Error('OpenCV global not found after load'));
+          waitForAPI();
         }
       };
       s.onerror = (e) => reject(e);
@@ -52,6 +67,7 @@ export async function loadOpenCVOnce() {
   }
   return cvLoadPromise;
 }
+
 // Hidden canvas just for CV processing (not added to DOM)
 const work = document.createElement('canvas');
 work.width = 480;  // you can try 640x480 later if corners are small
