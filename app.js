@@ -57,6 +57,109 @@ const work = document.createElement('canvas');
 work.width = 480;  // you can try 640x480 later if corners are small
 work.height = 360;
 const wctx = work.getContext('2d', { willReadFrequently: true });
+
+//OpenCV Step 2 End
+// v1.2 calibration (camera -> sheet homography)
+let H = null; // 3x3 cv.Mat mapping from *work-canvas video coords* to *sheet coords*
+
+function getFrameMatFromVideo(video) {
+  // Draw the current video frame into the offscreen work canvas and convert to cv.Mat
+  wctx.drawImage(video, 0, 0, work.width, work.height);
+  const imgData = wctx.getImageData(0, 0, work.width, work.height);
+  return cv.matFromImageData(imgData); // RGBA
+}
+
+function findSquaresAndHomographyFromCurrentFrame(video) {
+  if (!cvReady) return false;
+
+  const srcRgba = getFrameMatFromVideo(video);        // RGBA
+  const gray = new cv.Mat();
+  cv.cvtColor(srcRgba, gray, cv.COLOR_RGBA2GRAY);
+
+  const bin = new cv.Mat();
+  cv.adaptiveThreshold(
+    gray, bin, 255,
+    cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV,
+    31, 5
+  );
+
+  const kernel = cv.Mat.ones(3, 3, cv.CV_8U);
+  cv.morphologyEx(bin, bin, cv.MORPH_CLOSE, kernel);
+
+  const contours = new cv.MatVector();
+  const hierarchy = new cv.Mat();
+  cv.findContours(bin, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+
+  const cand = [];
+  for (let i = 0; i < contours.size(); i++) {
+    const c = contours.get(i);
+    const peri = cv.arcLength(c, true);
+    const approx = new cv.Mat();
+    cv.approxPolyDP(c, approx, 0.04 * peri, true);
+    const area = cv.contourArea(approx);
+    if (approx.rows === 4 && area > 150) {
+      const r = cv.boundingRect(approx);
+      const ratio = Math.max(r.width, r.height) / Math.max(1, Math.min(r.width, r.height));
+      if (ratio < 1.4) {
+        const M = cv.moments(approx, false);
+        const cx = M.m10 / (M.m00 || 1), cy = M.m01 / (M.m00 || 1);
+        const quad = [];
+        for (let k = 0; k < 4; k++) {
+          const x = approx.intPtr(k)[0], y = approx.intPtr(k)[1];
+          quad.push({ x, y });
+        }
+        cand.push({ area, cx, cy, quad });
+      }
+    }
+    approx.delete();
+    c.delete();
+  }
+
+  // cleanup
+  kernel.delete(); contours.delete(); hierarchy.delete();
+  srcRgba.delete(); gray.delete(); bin.delete();
+
+  if (cand.length < 4) {
+    console.warn('Calibration: found fewer than 4 corner squares');
+    return false;
+  }
+
+  // take top 4 by area and order TL, TR, BR, BL
+  cand.sort((a,b)=> b.area - a.area);
+  const four = cand.slice(0,4);
+  four.sort((a,b)=> a.cy - b.cy);
+  const top2 = four.slice(0,2).sort((a,b)=> a.cx - b.cx);
+  const bot2 = four.slice(2,4).sort((a,b)=> a.cx - b.cx);
+  const TL = top2[0], TR = top2[1], BR = bot2[1], BL = bot2[0];
+
+  function rectFrom(sq){
+    const xs = sq.quad.map(p=>p.x), ys = sq.quad.map(p=>p.y);
+    return { minx: Math.min(...xs), maxx: Math.max(...xs), miny: Math.min(...ys), maxy: Math.max(...ys) };
+  }
+  const rTL = rectFrom(TL), rTR = rectFrom(TR), rBR = rectFrom(BR), rBL = rectFrom(BL);
+
+  const src4 = cv.matFromArray(4, 1, cv.CV_32FC2, new Float32Array([
+    rTL.minx, rTL.miny,   // TL  (in work-canvas video coords)
+    rTR.maxx, rTR.miny,   // TR
+    rBR.maxx, rBR.maxy,   // BR
+    rBL.minx, rBL.maxy    // BL
+  ]));
+  const dst4 = cv.matFromArray(4, 1, cv.CV_32FC2, new Float32Array([
+    0, 0,
+    SHEET_W, 0,
+    SHEET_W, SHEET_H,
+    0, SHEET_H
+  ]));
+
+  const Hmat = cv.getPerspectiveTransform(src4, dst4);
+  src4.delete(); dst4.delete();
+
+  if (H) H.delete?.();
+  H = Hmat;
+  console.log('Calibration: homography set');
+  return true;
+}
+//OpenCV Step 3
 // OpenCV End
 
 
