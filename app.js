@@ -23,7 +23,7 @@ const basePads = [
   { name: "Clap",    x: 192, y: 180, r: 32, sound: "sounds/clap.wav" },
   { name: "HiHat O", x: 320, y: 180, r: 30, sound: "sounds/hihat_open.wav" },
 ];
-// OpenCV start
+/* OpenCV start
 // --- OpenCV lazy loader (no <script> tag in HTML needed) ---
 let cvReady = false;
 let cvLoadPromise = null;
@@ -57,7 +57,7 @@ const work = document.createElement('canvas');
 work.width = 480;  // you can try 640x480 later if corners are small
 work.height = 360;
 const wctx = work.getContext('2d', { willReadFrequently: true });
-// Open CV End
+*/
 
 
 function syncOverlaySizeToVideo() {
