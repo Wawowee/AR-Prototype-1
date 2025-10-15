@@ -122,6 +122,9 @@ async function initCamera() {
   resizeCanvas();
 }
 
+window.startCamera = startCamera;
+window.onCalibrateClick = onCalibrateClick;
+
 async function initHands() {
   const filesetResolver = await FilesetResolver.forVisionTasks(
     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
