@@ -94,7 +94,7 @@ const wctx = work.getContext('2d', { willReadFrequently: true });
 // v1.2 calibration (camera -> sheet homography)
 let H = null; // 3x3 cv.Mat mapping from *work-canvas video coords* to *sheet coords*
 
-// Calibration Trial 2 Seg1
+
 // Grab a full-resolution frame from the <video> and convert it to a cv.Mat (RGBA)
 function frameToMat(video) {
   const vw = video.videoWidth, vh = video.videoHeight;
@@ -105,10 +105,10 @@ function frameToMat(video) {
   // safer than matFromImageData across OpenCV.js builds
   return cv.imread(c); // CV_8UC4
 }
-// Calibration Trial 2 Seg1 end
 
 
-// Calibraiton Trial 2 Seg 3
+
+
 function findSquaresAndHomographyFromCurrentFrame(video) {
   if (!cvReady) return false;
 
@@ -183,7 +183,7 @@ function findSquaresAndHomographyFromCurrentFrame(video) {
   H = Hmat;
   return true;
 }
-// Calibration Trial 2 Seg3 End
+
 //OpenCV Step 3
 // OpenCV End
 
@@ -280,7 +280,7 @@ btnCam.onclick = async () => {
 };
 
 // Calibration verification message and check
-// Calibration Trial 2 Seg 4
+
 btnCal.onclick = async () => {
   statusEl.textContent = "Calibrating...";
   try {
@@ -341,9 +341,9 @@ btnCal.onclick = async () => {
     statusEl.textContent = "Calibration error (see console)";
   }
 };
-// Calibration Trial 2 Seg4 End
 
-// Calibration Trial 2 Seg2
+
+
 // VIDEO px -> OVERLAY px (same space as fingertip)
 function videoPtToOverlayPx({x, y}) {
   const overlayW = overlay.width, overlayH = overlay.height;
@@ -388,7 +388,7 @@ function computeHomographyOverlay(srcOverlayPts /* TL,TR,BR,BL */) {
   srcMat.delete(); dstMat.delete();
   return Hmat;
 }
-// Calibration Trail 2 Seg 2 End
+
 // --- Video → overlay mapping (accounts for object-fit: cover) ---
 function getCoverMapping(overlayW, overlayH, videoW, videoH) {
   const scale = Math.max(overlayW / videoW, overlayH / videoH);
