@@ -162,6 +162,49 @@ function findSquaresAndHomographyFromCurrentFrame(video) {
 }
 // Cal T3 S3 End
 
+// Cal T3 S6
+function rotatedRectVertices(rr) {
+  // Try the RotatedRect.points helper (some builds return an array, some a Mat)
+  if (cv.RotatedRect && typeof cv.RotatedRect.points === 'function') {
+    const pts = cv.RotatedRect.points(rr);
+    // If it's already an array of {x,y}, return it
+    if (Array.isArray(pts) && pts.length === 4 && 'x' in pts[0]) {
+      return pts;
+    }
+    // If it's a Mat (4x1 CV_32FC2), read the 8 floats
+    if (pts && pts.data32F && pts.data32F.length >= 8) {
+      const a = pts.data32F;
+      const out = [
+        { x: a[0], y: a[1] },
+        { x: a[2], y: a[3] },
+        { x: a[4], y: a[5] },
+        { x: a[6], y: a[7] },
+      ];
+      pts.delete?.();
+      return out;
+    }
+  }
+
+  // Fallback to boxPoints(rr) single-arg variant, which returns a Mat in many builds
+  if (typeof cv.boxPoints === 'function') {
+    const m = cv.boxPoints(rr); // no second arg!
+    if (m && m.data32F && m.data32F.length >= 8) {
+      const a = m.data32F;
+      const out = [
+        { x: a[0], y: a[1] },
+        { x: a[2], y: a[3] },
+        { x: a[4], y: a[5] },
+        { x: a[6], y: a[7] },
+      ];
+      m.delete?.();
+      return out;
+    }
+  }
+
+  throw new Error('Could not extract rotated-rect vertices from this OpenCV.js build');
+}
+// Cal T3 S6 End
+
 //OpenCV Step 3
 // OpenCV End
 
@@ -238,22 +281,13 @@ function detectSquareBoxesFullRes(src /* CV_8UC4 */) {
         const ar = r.width / Math.max(1, r.height);
         if (ar > 0.5 && ar < 1.6) {
           // Rotated rectangle + boxPoints ⇒ actual tilted square vertices
-          const rr = cv.minAreaRect(cnt);
-          // returns a 4x1 CV_32FC2 Mat in current builds
-          const pts = cv.RotatedRect.points(rr);
-
-          const box = [];
-          for (let k=0;k<4;k++) {
-            const fp = pts.floatPtr(k,0);
-            box.push({ x: fp[0], y: fp[1] });
-          }
-          // centroid
-          let cx = 0, cy = 0;
-          for (const v of box) { cx += v.x; cy += v.y; }
-          cx /= 4; cy /= 4;
-
-          cands.push({ area, cx, cy, box });      // keep center + 4 vertices
-          pts.delete();
+   const rr = cv.minAreaRect(cnt);
+   const box = rotatedRectVertices(rr);  // returns [{x,y}×4] whatever the build
+   // centroid of the 4 vertices
+   let cx = 0, cy = 0;
+   for (const v of box) { cx += v.x; cy += v.y; }
+   cx /= 4; cy /= 4;
+   cands.push({ area, cx, cy, box });
         }
       }
     }
