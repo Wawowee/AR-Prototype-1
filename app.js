@@ -86,8 +86,8 @@ export async function loadOpenCVOnce() {
 
 // Hidden canvas just for CV processing (not added to DOM)
 const work = document.createElement('canvas');
-work.width = 640;  // you can try 640x480 later if corners are small
-work.height = 480;
+work.width = 1280;  // you can try 640x480 later if corners are small
+work.height = 720;
 const wctx = work.getContext('2d', { willReadFrequently: true });
 
 //OpenCV Step 2 End
