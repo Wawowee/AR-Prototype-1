@@ -95,11 +95,11 @@ const wctx = work.getContext('2d', { willReadFrequently: true });
 let H = null; // 3x3 cv.Mat mapping from *work-canvas video coords* to *sheet coords*
 
  function getFrameMatFromVideo(video) {
-
-  // Draw the current video frame into the offscreen work canvas
+// Draw the current video frame into the offscreen work canvas and convert to cv.Mat
  wctx.drawImage(video, 0, 0, work.width, work.height);
-  // Build a Mat from the canvas; this path avoids constructor timing issues
-return cv.imread(work); // RGBA
+  const imgData = wctx.getImageData(0, 0, work.width, work.height);
+  return cv.matFromImageData(imgData); // RGBA
+
  }
 
 
