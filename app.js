@@ -94,154 +94,96 @@ const wctx = work.getContext('2d', { willReadFrequently: true });
 // v1.2 calibration (camera -> sheet homography)
 let H = null; // 3x3 cv.Mat mapping from *work-canvas video coords* to *sheet coords*
 
- function getFrameMatFromVideo(video) {
-// Draw the current video frame into the offscreen work canvas and convert to cv.Mat
- wctx.drawImage(video, 0, 0, work.width, work.height);
-  const imgData = wctx.getImageData(0, 0, work.width, work.height);
-  return cv.matFromImageData(imgData); // RGBA
+// Calibration Trial 2 Seg1
+// Grab a full-resolution frame from the <video> and convert it to a cv.Mat (RGBA)
+function frameToMat(videoEl) {
+  const vw = videoEl.videoWidth, vh = videoEl.videoHeight;
+  const c = document.createElement('canvas');
+  c.width = vw; c.height = vh;
+  const g = c.getContext('2d', { willReadFrequently: true });
+  g.drawImage(videoEl, 0, 0, vw, vh);
+  // safer than matFromImageData across OpenCV.js builds
+  return cv.imread(c); // CV_8UC4
+}
+// Calibration Trial 2 Seg1 end
 
- }
 
-
-function findSquaresAndHomographyFromCurrentFrame(video) {
+// Calibraiton Trial 2 Seg 3
+function findSquaresAndHomographyFromCurrentFrame(videoEl) {
   if (!cvReady) return false;
 
-  const srcRgba = getFrameMatFromVideo(video);        // RGBA
-  const gray = new cv.Mat();
-  cv.cvtColor(srcRgba, gray, cv.COLOR_RGBA2GRAY);
+  // 1) full-res frame
+  const src = frameToMat(videoEl); // CV_8UC4
 
-  const bin = new cv.Mat();
-  cv.adaptiveThreshold(
-    gray, bin, 255,
-    cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV,
-    31, 5
-  );
+  // 2) binarize robustly
+  const gray = new cv.Mat(); cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+  const blur = new cv.Mat(); cv.GaussianBlur(gray, blur, new cv.Size(5,5), 0);
+  const bin  = new cv.Mat(); cv.threshold(blur, bin, 0, 255, cv.THRESH_BINARY_INV | cv.THRESH_OTSU);
 
-  const kernel = cv.Mat.ones(3, 3, cv.CV_8U);
-  cv.morphologyEx(bin, bin, cv.MORPH_CLOSE, kernel);
+  // 3) contours
+  const contours = new cv.MatVector(), hierarchy = new cv.Mat();
+  cv.findContours(bin, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
 
-  const contours = new cv.MatVector();
-  const hierarchy = new cv.Mat();
-  cv.findContours(bin, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-
+  const vw = src.cols, vh = src.rows, imgArea = vw*vh;
   const cand = [];
-  for (let i = 0; i < contours.size(); i++) {
+  for (let i=0;i<contours.size();i++) {
     const c = contours.get(i);
-    const peri = cv.arcLength(c, true);
+    const peri = cv.arcLength(c,true);
     const approx = new cv.Mat();
-    cv.approxPolyDP(c, approx, 0.04 * peri, true);
-    const area = cv.contourArea(approx);
-    if (approx.rows === 4 && area > 150) {
-      const r = cv.boundingRect(approx);
-      const ratio = Math.max(r.width, r.height) / Math.max(1, Math.min(r.width, r.height));
-      if (ratio < 1.4) {
-        const M = cv.moments(approx, false);
-        const cx = M.m10 / (M.m00 || 1), cy = M.m01 / (M.m00 || 1);
-        const quad = [];
-        for (let k = 0; k < 4; k++) {
-          const x = approx.intPtr(k)[0], y = approx.intPtr(k)[1];
-          quad.push({ x, y });
+    cv.approxPolyDP(c, approx, 0.03*peri, true);
+    if (approx.rows === 4 && cv.isContourConvex(approx)) {
+      const area = cv.contourArea(approx);
+      const areaFrac = area / imgArea;
+      if (areaFrac > 0.0006 && areaFrac < 0.25) {
+        const r = cv.boundingRect(approx);
+        const ar = r.width / r.height;
+        if (ar > 0.55 && ar < 1.45) {
+          // centroid for ranking
+          let cx=0, cy=0;
+          for (let j=0;j<4;j++){ cx+=approx.intPtr(j,0)[0]; cy+=approx.intPtr(j,0)[1]; }
+          cand.push({ x:cx/4, y:cy/4, area });
         }
-        cand.push({ area, cx, cy, quad });
       }
     }
-    approx.delete();
-    c.delete();
+    approx.delete(); c.delete();
   }
 
-  // cleanup
-  kernel.delete(); contours.delete(); hierarchy.delete();
-  srcRgba.delete(); gray.delete(); bin.delete();
+  contours.delete(); hierarchy.delete(); src.delete(); gray.delete(); blur.delete(); bin.delete();
 
-  if (cand.length < 4) {
-    console.warn('Calibration: found fewer than 4 corner squares');
-    return false;
-  }
+  if (cand.length < 4) return false;
 
-  // take top 4 by area and order TL, TR, BR, BL
-  cand.sort((a,b)=> b.area - a.area);
-  const four = cand.slice(0,4);
-  four.sort((a,b)=> a.cy - b.cy);
-  const top2 = four.slice(0,2).sort((a,b)=> a.cx - b.cx);
-  const bot2 = four.slice(2,4).sort((a,b)=> a.cx - b.cx);
-  const TL = top2[0], TR = top2[1], BR = bot2[1], BL = bot2[0];
+  // 4) choose the 4 most “spread out” points (robust set selection)
+  cand.sort((a,b)=>b.area-a.area);
+  const top = cand.slice(0,8);
+  let best=null, score=-1;
+  for (let i=0;i<top.length;i++)
+    for (let j=i+1;j<top.length;j++)
+      for (let k=j+1;k<top.length;k++)
+        for (let l=k+1;l<top.length;l++){
+          const set=[top[i],top[j],top[k],top[l]];
+          let s=0;
+          for(let a=0;a<4;a++) for(let b=a+1;b<4;b++){
+            const dx=set[a].x-set[b].x, dy=set[a].y-set[b].y; s+=dx*dx+dy*dy;
+          }
+          if (s>score){ score=s; best=set; }
+        }
 
-  function rectFrom(sq){
-    const xs = sq.quad.map(p=>p.x), ys = sq.quad.map(p=>p.y);
-    return { minx: Math.min(...xs), maxx: Math.max(...xs), miny: Math.min(...ys), maxy: Math.max(...ys) };
-  }
-  // Calibration fix T1
-  // Compute overall center of the sheet from square centers
-  const cxMean = (TL.cx + TR.cx + BR.cx + BL.cx) / 4;
-  const cyMean = (TL.cy + TR.cy + BR.cy + BL.cy) / 4;
+  if (!best) return false;
 
-  // helper: get rotated-rect vertices for a contour
-  function boxPointsFromContour(quadLikeContour) {
-    // Reconstruct a Mat contour from quad points (int)
-    const pts = new cv.Mat(quadLikeContour.quad.length, 1, cv.CV_32SC2);
-    for (let i = 0; i < quadLikeContour.quad.length; i++) {
-      const {x,y} = quadLikeContour.quad[i];
-      pts.intPtr(i,0)[0] = x;
-      pts.intPtr(i,0)[1] = y;
-    }
-    const rr = cv.minAreaRect(pts);
-    // rr has .center, .size, .angle; we need its 4 corner points:
-    const vertices = new cv.Mat();
-    cv.RotatedRect.points(rr, vertices); // vertices: 4x1 CV_32FC2
-    const arr = [];
-    for (let i = 0; i < 4; i++) {
-      const px = vertices.floatPtr(i,0)[0];
-      const py = vertices.floatPtr(i,0)[1];
-      arr.push({x: px, y: py});
-    }
-    pts.delete(); vertices.delete();
-    return arr;
-  }
+  // 5) order TL,TR,BR,BL in VIDEO space
+  const orderedVideo = orderCornersTLTRBRBL(best);
 
-  // choose the vertex that points outward from the sheet center
-  function outwardVertex(square) {
-    const box = boxPointsFromContour(square);
-    let best = box[0], bestDot = -Infinity;
-    const dirX = square.cx - cxMean;
-    const dirY = square.cy - cyMean;
-    for (const v of box) {
-      // vertex direction relative to square center
-      const vx = v.x - square.cx;
-      const vy = v.y - square.cy;
-      const dot = vx*dirX + vy*dirY;
-      if (dot > bestDot) { bestDot = dot; best = v; }
-    }
-    return best;
-  }
+  // 6) convert those to OVERLAY px (your fingertip space)
+  const orderedOverlay = orderedVideo.map(videoPtToOverlayPx);
 
-  const vTL = outwardVertex(TL);
-  const vTR = outwardVertex(TR);
-  const vBR = outwardVertex(BR);
-  const vBL = outwardVertex(BL);
+  // 7) build H in overlay→sheet space
+  const Hmat = computeHomographyOverlay(orderedOverlay);
 
-  const src4 = cv.matFromArray(4, 1, cv.CV_32FC2, new Float32Array([
-    vTL.x, vTL.y,   // TL
-    vTR.x, vTR.y,   // TR
-    vBR.x, vBR.y,   // BR
-    vBL.x, vBL.y    // BL
-  ]));
-
-  const dst4 = cv.matFromArray(4, 1, cv.CV_32FC2, new Float32Array([
-    0, 0,
-    SHEET_W, 0,
-    SHEET_W, SHEET_H,
-    0, SHEET_H
-  ]));
-
-  const Hmat = cv.getPerspectiveTransform(src4, dst4);
-  src4.delete(); dst4.delete();
   if (H) H.delete?.();
   H = Hmat;
-  console.log('Calibration: homography set (rotated-rect outward corners)');
   return true;
-  // Calibration trial end
-
 }
+// Calibration Trial 2 Seg3 End
 //OpenCV Step 3
 // OpenCV End
 
@@ -338,26 +280,115 @@ btnCam.onclick = async () => {
 };
 
 // Calibration verification message and check
+// Calibration Trial 2 Seg 4
 btnCal.onclick = async () => {
   statusEl.textContent = "Calibrating...";
   try {
-    await loadOpenCVOnce(); // lazy load; no-op after first time
+    await loadOpenCVOnce();
     const ok = findSquaresAndHomographyFromCurrentFrame(video);
     statusEl.textContent = ok ? "Calibrated" : "Calibration failed";
-    // visual breadcrumb on overlay
     const g = overlay.getContext('2d');
     g.save();
     g.strokeStyle = ok ? "#00ff66" : "#ff3355";
     g.lineWidth = 4;
     g.strokeRect(8,8, overlay.width-16, overlay.height-16);
+
+    // optional: show the picked corners (recompute to draw)
+    if (ok) {
+      const src = frameToMat(video);
+      // repeat only steps 2–5 quickly to redraw (or refactor to return the points)
+      const gray = new cv.Mat(); cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+      const blur = new cv.Mat(); cv.GaussianBlur(gray, blur, new cv.Size(5,5), 0);
+      const bin  = new cv.Mat(); cv.threshold(blur, bin, 0, 255, cv.THRESH_BINARY_INV | cv.THRESH_OTSU);
+      const contours = new cv.MatVector(), hierarchy = new cv.Mat();
+      cv.findContours(bin, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
+      const vw = src.cols, vh = src.rows, imgArea = vw*vh;
+      const cand=[]; for (let i=0;i<contours.size();i++){ const c=contours.get(i);
+        const peri=cv.arcLength(c,true), approx=new cv.Mat();
+        cv.approxPolyDP(c, approx, 0.03*peri, true);
+        if (approx.rows===4 && cv.isContourConvex(approx)){
+          const area=cv.contourArea(approx), areaFrac=area/imgArea;
+          if (areaFrac>0.0006 && areaFrac<0.25){
+            const r=cv.boundingRect(approx), ar=r.width/r.height;
+            if (ar>0.55 && ar<1.45){ let cx=0,cy=0;
+              for (let j=0;j<4;j++){ cx+=approx.intPtr(j,0)[0]; cy+=approx.intPtr(j,0)[1]; }
+              cand.push({x:cx/4, y:cy/4, area});
+            }
+          }
+        }
+        approx.delete(); c.delete();
+      }
+      contours.delete(); hierarchy.delete(); src.delete(); gray.delete(); blur.delete(); bin.delete();
+      if (cand.length>=4){
+        cand.sort((a,b)=>b.area-a.area);
+        const top=cand.slice(0,8);
+        let best=null,score=-1;
+        for(let i=0;i<top.length;i++)for(let j=i+1;j<top.length;j++)for(let k=j+1;k<top.length;k++)for(let l=k+1;l<top.length;l++){
+          const set=[top[i],top[j],top[k],top[l]];
+          let s=0; for(let a=0;a<4;a++)for(let b=a+1;b<4;b++){ const dx=set[a].x-set[b].x, dy=set[a].y-set[b].y; s+=dx*dx+dy*dy; }
+          if(s>score){score=s;best=set;}
+        }
+        if(best){
+          const ordered = orderCornersTLTRBRBL(best).map(videoPtToOverlayPx);
+          g.fillStyle = "#00ff66";
+          for (const p of ordered) { g.beginPath(); g.arc(p.px,p.py,6,0,Math.PI*2); g.fill(); }
+        }
+      }
+    }
     g.restore();
   } catch (e) {
     console.error("Calibration error", e);
     statusEl.textContent = "Calibration error (see console)";
   }
 };
+// Calibration Trial 2 Seg4 End
 
+// Calibration Trial 2 Seg2
+// VIDEO px -> OVERLAY px (same space as fingertip)
+function videoPtToOverlayPx({x, y}) {
+  const overlayW = overlay.width, overlayH = overlay.height;
+  const videoW   = video.videoWidth || overlayW;
+  const videoH   = video.videoHeight || overlayH;
 
+  const { displayW, displayH, offsetX, offsetY } =
+    getCoverMapping(overlayW, overlayH, videoW, videoH);
+
+  const nx = cbMirror.checked ? (1 - x / videoW) : (x / videoW);
+  const ny = y / videoH;
+
+  return { px: offsetX + nx * displayW, py: offsetY + ny * displayH };
+}
+
+// Order arbitrary 4 points as TL,TR,BR,BL by sums/diffs
+function orderCornersTLTRBRBL(pts) {
+  const sum  = pts.map(p => p.x + p.y);
+  const diff = pts.map(p => p.x - p.y);
+  const TL = pts[sum.indexOf(Math.min(...sum))];
+  const BR = pts[sum.indexOf(Math.max(...sum))];
+  const TR = pts[diff.indexOf(Math.max(...diff))];
+  const BL = pts[diff.indexOf(Math.min(...diff))];
+  return [TL, TR, BR, BL];
+}
+
+// Build homography from OVERLAY space -> sheet space
+function computeHomographyOverlay(srcOverlayPts /* TL,TR,BR,BL */) {
+  const dst = [
+    {x:0, y:0}, {x:SHEET_W, y:0}, {x:SHEET_W, y:SHEET_H}, {x:0, y:SHEET_H}
+  ];
+  const srcMat = cv.matFromArray(4,1,cv.CV_32FC2,new Float32Array([
+    srcOverlayPts[0].px, srcOverlayPts[0].py,
+    srcOverlayPts[1].px, srcOverlayPts[1].py,
+    srcOverlayPts[2].px, srcOverlayPts[2].py,
+    srcOverlayPts[3].px, srcOverlayPts[3].py,
+  ]));
+  const dstMat = cv.matFromArray(4,1,cv.CV_32FC2,new Float32Array([
+    dst[0].x, dst[0].y, dst[1].x, dst[1].y, dst[2].x, dst[2].y, dst[3].x, dst[3].y
+  ]));
+  const Hmat = cv.getPerspectiveTransform(srcMat, dstMat);
+  srcMat.delete(); dstMat.delete();
+  return Hmat;
+}
+// Calibration Trail 2 Seg 2 End
 // --- Video → overlay mapping (accounts for object-fit: cover) ---
 function getCoverMapping(overlayW, overlayH, videoW, videoH) {
   const scale = Math.max(overlayW / videoW, overlayH / videoH);
