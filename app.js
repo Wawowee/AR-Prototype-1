@@ -96,12 +96,12 @@ let H = null; // 3x3 cv.Mat mapping from *work-canvas video coords* to *sheet co
 
 // Calibration Trial 2 Seg1
 // Grab a full-resolution frame from the <video> and convert it to a cv.Mat (RGBA)
-function frameToMat(videoEl) {
-  const vw = videoEl.videoWidth, vh = videoEl.videoHeight;
+function frameToMat(video) {
+  const vw = video.videoWidth, vh = video.videoHeight;
   const c = document.createElement('canvas');
   c.width = vw; c.height = vh;
   const g = c.getContext('2d', { willReadFrequently: true });
-  g.drawImage(videoEl, 0, 0, vw, vh);
+  g.drawImage(video, 0, 0, vw, vh);
   // safer than matFromImageData across OpenCV.js builds
   return cv.imread(c); // CV_8UC4
 }
@@ -109,11 +109,11 @@ function frameToMat(videoEl) {
 
 
 // Calibraiton Trial 2 Seg 3
-function findSquaresAndHomographyFromCurrentFrame(videoEl) {
+function findSquaresAndHomographyFromCurrentFrame(video) {
   if (!cvReady) return false;
 
   // 1) full-res frame
-  const src = frameToMat(videoEl); // CV_8UC4
+  const src = frameToMat(video); // CV_8UC4
 
   // 2) binarize robustly
   const gray = new cv.Mat(); cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
