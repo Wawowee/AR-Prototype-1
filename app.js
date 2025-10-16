@@ -187,6 +187,18 @@ function findSquaresAndHomographyFromCurrentFrame(video) {
 //OpenCV Step 3
 // OpenCV End
 
+// Cal T3 S1
+async function ensureVideoReady() {
+  if (video.videoWidth && video.videoHeight) return;
+  await new Promise(res => {
+    const onMeta = () => { video.removeEventListener('loadedmetadata', onMeta); res(); };
+    video.addEventListener('loadedmetadata', onMeta);
+  });
+}
+
+//Cal T3 S1 End
+
+
 
 function syncOverlaySizeToVideo() {
   const v = document.getElementById('video');
