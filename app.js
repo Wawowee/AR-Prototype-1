@@ -26,47 +26,63 @@ const basePads = [
 // OpenCV start
 // --- OpenCV lazy loader (no <script> tag in HTML needed) ---
 // --- OpenCV lazy loader (robust wait) ---
+// --- OpenCV lazy loader (no CORS, with fallback) ---
 let cvReady = false;
 let cvLoadPromise = null;
+
 export async function loadOpenCVOnce() {
   if (cvReady) return;
-  if (!cvLoadPromise) {
-    cvLoadPromise = new Promise((resolve, reject) => {
+  if (cvLoadPromise) return cvLoadPromise;
+
+  const sources = [
+    'https://docs.opencv.org/4.x/opencv.js',
+    // fallback (versioned mirror). If you prefer, you can remove this line.
+    'https://cdn.jsdelivr.net/gh/opencv/opencv@4.x/platforms/js/opencv.js'
+  ];
+
+  cvLoadPromise = new Promise((resolve, reject) => {
+    let idx = 0;
+
+    const tryNext = () => {
+      if (idx >= sources.length) {
+        reject(new Error('Failed to load OpenCV.js from all sources'));
+        return;
+      }
+      const url = sources[idx++];
       const s = document.createElement('script');
-      s.src = 'https://docs.opencv.org/4.x/opencv.js';
-      s.async = true;
-      s.crossOrigin = 'anonymous';
+      s.src = url;
+      s.async = true;          // ok: we wait for readiness explicitly
+      // IMPORTANT: do NOT set s.crossOrigin, or you’ll trigger CORS for this script
       s.onload = () => {
+        // Wait until the API is actually ready (constructors wired)
         const waitForAPI = () => {
-          const ok =
-            typeof window.cv === 'object' &&
-            typeof cv.Mat === 'function' &&
-            typeof cv.getPerspectiveTransform === 'function';
-          if (ok) {
-            cvReady = true;
-            resolve();
-          } else {
-            setTimeout(waitForAPI, 25);
-          }
+          const ok = (typeof window.cv === 'object'
+                   && typeof cv.Mat === 'function'
+                   && typeof cv.getPerspectiveTransform === 'function');
+          if (ok) { cvReady = true; resolve(); }
+          else { setTimeout(waitForAPI, 25); }
         };
-        // If the build exposes onRuntimeInitialized, hook it; otherwise poll.
         if (window.cv && typeof cv.onRuntimeInitialized === 'function') {
-          cv.onRuntimeInitialized = () => {
-            cvReady = true;
-            resolve();
-          };
-          // Also start a poll in case the callback isn't fired in this build
+          cv.onRuntimeInitialized = () => { cvReady = true; resolve(); };
+          // Also poll just in case onRuntimeInitialized isn’t fired in this build
           waitForAPI();
         } else {
           waitForAPI();
         }
       };
-      s.onerror = (e) => reject(e);
+      s.onerror = () => {
+        console.warn('OpenCV load failed from', url, '— trying fallback…');
+        tryNext();
+      };
       document.head.appendChild(s);
-    });
-  }
+    };
+
+    tryNext();
+  });
+
   return cvLoadPromise;
 }
+
 
 // Hidden canvas just for CV processing (not added to DOM)
 const work = document.createElement('canvas');
