@@ -238,9 +238,10 @@ function detectSquareBoxesFullRes(src /* CV_8UC4 */) {
         const ar = r.width / Math.max(1, r.height);
         if (ar > 0.5 && ar < 1.6) {
           // Rotated rectangle + boxPoints ⇒ actual tilted square vertices
-          const rr = cv.minAreaRect(cnt);         // rotated rect
-          const pts = new cv.Mat();               // 4x1 CV_32FC2
-          cv.boxPoints(rr, pts);                  // fill pts with 4 floats
+          const rr = cv.minAreaRect(cnt);
+          // returns a 4x1 CV_32FC2 Mat in current builds
+          const pts = cv.RotatedRect.points(rr);
+
           const box = [];
           for (let k=0;k<4;k++) {
             const fp = pts.floatPtr(k,0);
@@ -352,6 +353,7 @@ btnCam.onclick = async () => {
 btnCal.onclick = async () => {
   statusEl.textContent = "Calibrating...";
   try {
+    await ensureVideoReady();  // Cal T3 S5
     await loadOpenCVOnce();
     const ok = findSquaresAndHomographyFromCurrentFrame(video);
     statusEl.textContent = ok ? "Calibrated" : "Calibration failed";
