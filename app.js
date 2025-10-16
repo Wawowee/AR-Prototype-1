@@ -108,81 +108,59 @@ function frameToMat(video) {
 
 
 
-
+// Cal T3 S3
 function findSquaresAndHomographyFromCurrentFrame(video) {
   if (!cvReady) return false;
 
-  // 1) full-res frame
-  const src = frameToMat(video); // CV_8UC4
+  const src = frameToMat(video);                  // FULL video Mat
+  const cands = detectSquareBoxesFullRes(src);
+  src.delete();
 
-  // 2) binarize robustly
-  const gray = new cv.Mat(); cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-  const blur = new cv.Mat(); cv.GaussianBlur(gray, blur, new cv.Size(5,5), 0);
-  const bin  = new cv.Mat(); cv.threshold(blur, bin, 0, 255, cv.THRESH_BINARY_INV | cv.THRESH_OTSU);
+  if (!cands || cands.length < 4) return false;
 
-  // 3) contours
-  const contours = new cv.MatVector(), hierarchy = new cv.Mat();
-  cv.findContours(bin, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
+  const four = chooseFourMostSpread(cands);
+  if (!four) return false;
 
-  const vw = src.cols, vh = src.rows, imgArea = vw*vh;
-  const cand = [];
-  for (let i=0;i<contours.size();i++) {
-    const c = contours.get(i);
-    const peri = cv.arcLength(c,true);
-    const approx = new cv.Mat();
-    cv.approxPolyDP(c, approx, 0.03*peri, true);
-    if (approx.rows === 4 && cv.isContourConvex(approx)) {
-      const area = cv.contourArea(approx);
-      const areaFrac = area / imgArea;
-      if (areaFrac > 0.0006 && areaFrac < 0.25) {
-        const r = cv.boundingRect(approx);
-        const ar = r.width / r.height;
-        if (ar > 0.55 && ar < 1.45) {
-          // centroid for ranking
-          let cx=0, cy=0;
-          for (let j=0;j<4;j++){ cx+=approx.intPtr(j,0)[0]; cy+=approx.intPtr(j,0)[1]; }
-          cand.push({ x:cx/4, y:cy/4, area });
-        }
-      }
+  // overall sheet center from the four square centers
+  const cxMean = (four[0].cx + four[1].cx + four[2].cx + four[3].cx) / 4;
+  const cyMean = (four[0].cy + four[1].cy + four[2].cy + four[3].cy) / 4;
+
+  // for each square, choose the vertex pointing OUTWARD from the sheet center
+  function outwardVertex(sq) {
+    let best = sq.box[0], bestDot = -Infinity;
+    const dirX = sq.cx - cxMean, dirY = sq.cy - cyMean; // center→outer direction
+    for (const v of sq.box) {
+      const vx = v.x - sq.cx, vy = v.y - sq.cy;         // vertex relative to center
+      const dot = vx*dirX + vy*dirY;
+      if (dot > bestDot) { bestDot = dot; best = v; }
     }
-    approx.delete(); c.delete();
+    return best; // VIDEO px
   }
 
-  contours.delete(); hierarchy.delete(); src.delete(); gray.delete(); blur.delete(); bin.delete();
+  const videoCorners = four.map(outwardVertex);               // 4 VIDEO points
+  const orderedVideo = orderTLTRBRBLBySumDiff(videoCorners);  // TL,TR,BR,BL
 
-  if (cand.length < 4) return false;
+  // convert to OVERLAY px (same pixel space as fingertip)
+  const overlayCorners = orderedVideo.map(({x,y}) => videoPtToOverlayPx({x,y}));
 
-  // 4) choose the 4 most “spread out” points (robust set selection)
-  cand.sort((a,b)=>b.area-a.area);
-  const top = cand.slice(0,8);
-  let best=null, score=-1;
-  for (let i=0;i<top.length;i++)
-    for (let j=i+1;j<top.length;j++)
-      for (let k=j+1;k<top.length;k++)
-        for (let l=k+1;l<top.length;l++){
-          const set=[top[i],top[j],top[k],top[l]];
-          let s=0;
-          for(let a=0;a<4;a++) for(let b=a+1;b<4;b++){
-            const dx=set[a].x-set[b].x, dy=set[a].y-set[b].y; s+=dx*dx+dy*dy;
-          }
-          if (s>score){ score=s; best=set; }
-        }
-
-  if (!best) return false;
-
-  // 5) order TL,TR,BR,BL in VIDEO space
-  const orderedVideo = orderCornersTLTRBRBL(best);
-
-  // 6) convert those to OVERLAY px (your fingertip space)
-  const orderedOverlay = orderedVideo.map(videoPtToOverlayPx);
-
-  // 7) build H in overlay→sheet space
-  const Hmat = computeHomographyOverlay(orderedOverlay);
+  // build homography (overlay -> sheet)
+  const srcMat = cv.matFromArray(4,1,cv.CV_32FC2,new Float32Array([
+    overlayCorners[0].px, overlayCorners[0].py,
+    overlayCorners[1].px, overlayCorners[1].py,
+    overlayCorners[2].px, overlayCorners[2].py,
+    overlayCorners[3].px, overlayCorners[3].py,
+  ]));
+  const dstMat = cv.matFromArray(4,1,cv.CV_32FC2,new Float32Array([
+    0,0,  SHEET_W,0,  SHEET_W,SHEET_H,  0,SHEET_H
+  ]));
+  const Hmat = cv.getPerspectiveTransform(srcMat, dstMat);
+  srcMat.delete(); dstMat.delete();
 
   if (H) H.delete?.();
   H = Hmat;
   return true;
 }
+// Cal T3 S3 End
 
 //OpenCV Step 3
 // OpenCV End
@@ -235,7 +213,85 @@ function resizeCanvas() {
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 
+// Cal T2 S2
+function detectSquareBoxesFullRes(src /* CV_8UC4 */) {
+  const gray = new cv.Mat(); cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+  const blur = new cv.Mat(); cv.GaussianBlur(gray, blur, new cv.Size(5,5), 0);
+  const bin  = new cv.Mat(); cv.threshold(blur, bin, 0, 255, cv.THRESH_BINARY_INV | cv.THRESH_OTSU);
 
+  const contours = new cv.MatVector(), hierarchy = new cv.Mat();
+  cv.findContours(bin, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
+
+  const vw = src.cols, vh = src.rows, imgArea = vw * vh;
+  const cands = [];
+
+  for (let i=0;i<contours.size();i++) {
+    const cnt = contours.get(i);
+    const peri = cv.arcLength(cnt, true);
+    const approx = new cv.Mat();
+    cv.approxPolyDP(cnt, approx, 0.03 * peri, true);
+    if (approx.rows === 4 && cv.isContourConvex(approx)) {
+      const area = cv.contourArea(approx);
+      const af = area / imgArea;
+      if (af > 0.0005 && af < 0.3) {
+        const r = cv.boundingRect(approx);
+        const ar = r.width / Math.max(1, r.height);
+        if (ar > 0.5 && ar < 1.6) {
+          // Rotated rectangle + boxPoints ⇒ actual tilted square vertices
+          const rr = cv.minAreaRect(cnt);         // rotated rect
+          const pts = new cv.Mat();               // 4x1 CV_32FC2
+          cv.boxPoints(rr, pts);                  // fill pts with 4 floats
+          const box = [];
+          for (let k=0;k<4;k++) {
+            const fp = pts.floatPtr(k,0);
+            box.push({ x: fp[0], y: fp[1] });
+          }
+          // centroid
+          let cx = 0, cy = 0;
+          for (const v of box) { cx += v.x; cy += v.y; }
+          cx /= 4; cy /= 4;
+
+          cands.push({ area, cx, cy, box });      // keep center + 4 vertices
+          pts.delete();
+        }
+      }
+    }
+    approx.delete(); cnt.delete();
+  }
+
+  contours.delete(); hierarchy.delete(); gray.delete(); blur.delete(); bin.delete();
+  return cands; // array of { area, cx, cy, box:[{x,y}*4] } in VIDEO px
+}
+
+function chooseFourMostSpread(cands) {
+  if (cands.length < 4) return null;
+  const top = [...cands].sort((a,b)=>b.area-a.area).slice(0,8); // limit search
+  let best = null, bestScore = -1;
+  for (let i=0;i<top.length;i++)
+    for (let j=i+1;j<top.length;j++)
+      for (let k=j+1;k<top.length;k++)
+        for (let l=k+1;l<top.length;l++) {
+          const set = [top[i], top[j], top[k], top[l]];
+          // sum of pairwise distances between centers
+          let s = 0;
+          for (let a=0;a<4;a++) for (let b=a+1;b<4;b++) {
+            const dx=set[a].cx-set[b].cx, dy=set[a].cy-set[b].cy; s += dx*dx + dy*dy;
+          }
+          if (s > bestScore) { bestScore = s; best = set; }
+        }
+  return best; // 4 items
+}
+
+function orderTLTRBRBLBySumDiff(pts /* [{x,y}*4] */) {
+  const sum  = pts.map(p => p.x + p.y);
+  const diff = pts.map(p => p.x - p.y);
+  const TL = pts[sum.indexOf(Math.min(...sum))];
+  const BR = pts[sum.indexOf(Math.max(...sum))];
+  const TR = pts[diff.indexOf(Math.max(...diff))];
+  const BL = pts[diff.indexOf(Math.min(...diff))];
+  return [TL, TR, BR, BL];
+}
+// Cal T2 S2 End
 
 
 async function initAudio() {
