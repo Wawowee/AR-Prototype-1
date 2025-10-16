@@ -170,14 +170,37 @@ function findSquaresAndHomographyFromCurrentFrame(video) {
     const xs = sq.quad.map(p=>p.x), ys = sq.quad.map(p=>p.y);
     return { minx: Math.min(...xs), maxx: Math.max(...xs), miny: Math.min(...ys), maxy: Math.max(...ys) };
   }
-  const rTL = rectFrom(TL), rTR = rectFrom(TR), rBR = rectFrom(BR), rBL = rectFrom(BL);
+  // Calibration fix T1
+  // ---- robust corner selection ----
+  // Compute overall center of the four detected squares
+  const cxMean = (TL.cx + TR.cx + BR.cx + BL.cx) / 4;
+  const cyMean = (TL.cy + TR.cy + BR.cy + BL.cy) / 4;
 
+  // For each square, pick the vertex farthest from the overall center (the “outer” corner)
+  function outerVertex(square) {
+    let best = square.quad[0], bestD2 = -1;
+    for (const v of square.quad) {
+      const dx = v.x - cxMean, dy = v.y - cyMean;
+      const d2 = dx*dx + dy*dy;
+      if (d2 > bestD2) { bestD2 = d2; best = v; }
+    }
+    return best;
+  }
+
+  const vTL = outerVertex(TL);
+  const vTR = outerVertex(TR);
+  const vBR = outerVertex(BR);
+  const vBL = outerVertex(BL);
+
+  // Now build src points directly from those four chosen vertices (in work-canvas pixel coords)
   const src4 = cv.matFromArray(4, 1, cv.CV_32FC2, new Float32Array([
-    rTL.minx, rTL.miny,   // TL  (in work-canvas video coords)
-    rTR.maxx, rTR.miny,   // TR
-    rBR.maxx, rBR.maxy,   // BR
-    rBL.minx, rBL.maxy    // BL
+    vTL.x, vTL.y,   // TL
+    vTR.x, vTR.y,   // TR
+    vBR.x, vBR.y,   // BR
+    vBL.x, vBL.y    // BL
+    // Calibration fix end
   ]));
+
   const dst4 = cv.matFromArray(4, 1, cv.CV_32FC2, new Float32Array([
     0, 0,
     SHEET_W, 0,
@@ -190,8 +213,9 @@ function findSquaresAndHomographyFromCurrentFrame(video) {
 
   if (H) H.delete?.();
   H = Hmat;
-  console.log('Calibration: homography set');
+  console.log('Calibration: homography set (robust vertices)');
   return true;
+
 }
 //OpenCV Step 3
 // OpenCV End
