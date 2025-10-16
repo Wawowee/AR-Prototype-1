@@ -25,7 +25,6 @@ const basePads = [
 ];
 // OpenCV start
 // --- OpenCV lazy loader (no <script> tag in HTML needed) ---
-// --- OpenCV lazy loader (robust wait) ---
 let cvReady = false;
 let cvLoadPromise = null;
 export async function loadOpenCVOnce() {
@@ -34,31 +33,17 @@ export async function loadOpenCVOnce() {
     cvLoadPromise = new Promise((resolve, reject) => {
       const s = document.createElement('script');
       s.src = 'https://docs.opencv.org/4.x/opencv.js';
-      s.async = true;
-      s.crossOrigin = 'anonymous';
+      s.async = true;              // okay here; we'll wait on onRuntimeInitialized
       s.onload = () => {
-        const waitForAPI = () => {
-          const ok =
-            typeof window.cv === 'object' &&
-            typeof cv.Mat === 'function' &&
-            typeof cv.getPerspectiveTransform === 'function';
-          if (ok) {
-            cvReady = true;
-            resolve();
+        if (window.cv) {
+          if (typeof cv.onRuntimeInitialized === 'function') {
+            cv.onRuntimeInitialized = () => { cvReady = true; resolve(); };
           } else {
-            setTimeout(waitForAPI, 25);
+            // Some builds are already initialized
+            cvReady = true; resolve();
           }
-        };
-        // If the build exposes onRuntimeInitialized, hook it; otherwise poll.
-        if (window.cv && typeof cv.onRuntimeInitialized === 'function') {
-          cv.onRuntimeInitialized = () => {
-            cvReady = true;
-            resolve();
-          };
-          // Also start a poll in case the callback isn't fired in this build
-          waitForAPI();
         } else {
-          waitForAPI();
+          reject(new Error('OpenCV global not found after load'));
         }
       };
       s.onerror = (e) => reject(e);
@@ -67,7 +52,6 @@ export async function loadOpenCVOnce() {
   }
   return cvLoadPromise;
 }
-
 // Hidden canvas just for CV processing (not added to DOM)
 const work = document.createElement('canvas');
 work.width = 480;  // you can try 640x480 later if corners are small
@@ -79,11 +63,13 @@ const wctx = work.getContext('2d', { willReadFrequently: true });
 let H = null; // 3x3 cv.Mat mapping from *work-canvas video coords* to *sheet coords*
 
 function getFrameMatFromVideo(video) {
-  // Draw the current video frame into the offscreen work canvas and convert to cv.Mat
+  // Draw the current video frame into the offscreen work canvas
   wctx.drawImage(video, 0, 0, work.width, work.height);
-  const imgData = wctx.getImageData(0, 0, work.width, work.height);
-  return cv.matFromImageData(imgData); // RGBA
+  // Create a Mat from the canvas (RGBA)
+  const srcRgba = cv.imread(work);
+  return srcRgba;
 }
+
 
 function findSquaresAndHomographyFromCurrentFrame(video) {
   if (!cvReady) return false;
