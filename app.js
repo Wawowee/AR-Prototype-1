@@ -279,7 +279,7 @@ function detectSquareBoxesFullRes(src /* CV_8UC4 */) {
       if (af > 0.0005 && af < 0.3) {
         const r = cv.boundingRect(approx);
         const ar = r.width / Math.max(1, r.height);
-        if (ar > 0.5 && ar < 1.6) {
+        if (ar > 0.45 && ar < 1.7) {
           // Rotated rectangle + boxPoints ⇒ actual tilted square vertices
    const rr = cv.minAreaRect(cnt);
    const box = rotatedRectVertices(rr);  // returns [{x,y}×4] whatever the build
