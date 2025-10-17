@@ -591,8 +591,12 @@ async function loop(ts) {
     const lm = result.landmarks[0];
     const tip = lm[8]; // index fingertip
     const p = tipToOverlayPx(tip.x, tip.y);
-    tipPx = p;
-    tipSheet = overlayPxToSheet(p.px, p.py);
+    // Drum Cal T1
+   tipPx = p;    // Use homography when calibrated; fallback to v1.1 mapping otherwise
+  tipSheet = (H && cvReady)
+    ? mapOverlayToSheet(p.px, p.py)
+    : overlayPxToSheet(p.px, p.py);
+    // Drum Cal T1 End
   }
 
   if (tipSheet) {
