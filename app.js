@@ -530,24 +530,76 @@ function overlayPxToSheet(px, py) {
   return { x: u * SHEET_W, y: v * SHEET_H };
 }
 
-function renderOverlay(tipPx) {
-  ctx.clearRect(0, 0, overlay.width, overlay.height);
+// Drum Cal T1
+function drawPadsProjected(ctx) {
+  if (!Hinv || !cvReady) return;
 
-  const pads = padsForScreen();   // use Y-flipped pads
-  const sx = overlay.width / SHEET_W;
-  const sy = overlay.height / SHEET_H;
+  // project one sheet point -> overlay px using Hinv
+  const project = (sx, sy) => {
+    const src = cv.matFromArray(1, 1, cv.CV_32FC2, new Float32Array([sx, sy]));
+    const dst = new cv.Mat();
+    cv.perspectiveTransform(src, dst, Hinv);
+    const out = { x: dst.data32F[0], y: dst.data32F[1] };
+    src.delete(); dst.delete();
+    return out;
+  };
 
+  // pads in top-left sheet coords
+  const padsTL = padsForScreen();
+
+  ctx.save();
   ctx.lineWidth = 2;
-  for (const p of pads) {
+  ctx.strokeStyle = "rgba(0,170,255,0.95)";
+  ctx.fillStyle = "rgba(0,170,255,0.95)";
+  ctx.font = "12px system-ui";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  const SEG = 40; // circle approximation segments
+  for (const p of padsTL) {
+    // outline (circle warped to ellipse)
     ctx.beginPath();
-    ctx.arc(p.x * sx, p.y * sy, p.r * ((sx + sy) / 2), 0, Math.PI * 2);
-    ctx.strokeStyle = "rgba(255,255,255,0.85)";
+    for (let i = 0; i <= SEG; i++) {
+      const t = (i / SEG) * Math.PI * 2;
+      const sx = p.x + p.r * Math.cos(t);
+      const sy = p.y + p.r * Math.sin(t);
+      const { x, y } = project(sx, sy);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
     ctx.stroke();
-    ctx.font = "12px system-ui";
-    ctx.fillStyle = "rgba(255,255,255,0.9)";
-    ctx.fillText(p.name, p.x * sx - 16, p.y * sy + 4);
+
+    // label at projected center
+    const c = project(p.x, p.y);
+    ctx.fillText(p.name, c.x, c.y);
   }
 
+  ctx.restore();
+}
+// Drum Cal T1 End
+
+function renderOverlay(tipPx) {
+  ctx.clearRect(0, 0, overlay.width, overlay.height);
+// Drum Cal T1
+  if (Hinv && cvReady) {
+    // Projected pads that match the real paper under perspective
+    drawPadsProjected(ctx);
+  } else {
+    // v1.1 overlay (simple scale)
+    const pads = padsForScreen();
+    const sx = overlay.width / SHEET_W;
+    const sy = overlay.height / SHEET_H;
+    ctx.lineWidth = 2;
+    for (const p of pads) {
+      ctx.beginPath();
+      ctx.arc(p.x * sx, p.y * sy, p.r * ((sx + sy) / 2), 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(255,255,255,0.85)";
+      ctx.stroke();
+      ctx.font = "12px system-ui";
+      ctx.fillStyle = "rgba(255,255,255,0.9)";
+      ctx.fillText(p.name, p.x * sx, p.y * sy);
+    }
+  }
+// Drum Cal T1 End
   if (tipPx) {
     ctx.beginPath();
     ctx.arc(tipPx.px, tipPx.py, 7, 0, Math.PI*2);
