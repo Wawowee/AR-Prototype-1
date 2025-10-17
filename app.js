@@ -30,6 +30,8 @@ const basePads = [
 let cvReady = false;
 let cvLoadPromise = null;
 
+let lastOverlayCorners = null; // order Drum Cal T1
+
 export async function loadOpenCVOnce() {
   if (cvReady) return;
   if (cvLoadPromise) return cvLoadPromise;
@@ -144,24 +146,52 @@ function findSquaresAndHomographyFromCurrentFrame(video) {
   const overlayCorners = orderedVideo.map(({x,y}) => videoPtToOverlayPx({x,y}));
 
   // build homography (overlay -> sheet)
-  const srcMat = cv.matFromArray(4,1,cv.CV_32FC2,new Float32Array([
-    overlayCorners[0].px, overlayCorners[0].py,
-    overlayCorners[1].px, overlayCorners[1].py,
-    overlayCorners[2].px, overlayCorners[2].py,
-    overlayCorners[3].px, overlayCorners[3].py,
-  ]));
-  const dstMat = cv.matFromArray(4,1,cv.CV_32FC2,new Float32Array([
-    0,0,  SHEET_W,0,  SHEET_W,SHEET_H,  0,SHEET_H
-  ]));
-  const Hmat = cv.getPerspectiveTransform(srcMat, dstMat);
-  srcMat.delete(); dstMat.delete();
+// drum Cal T1
+const srcMat = cv.matFromArray(4,1,cv.CV_32FC2,new Float32Array([
+  overlayCorners[0].px, overlayCorners[0].py,
+  overlayCorners[1].px, overlayCorners[1].py,
+  overlayCorners[2].px, overlayCorners[2].py,
+  overlayCorners[3].px, overlayCorners[3].py,
+]));
+const dstMat = cv.matFromArray(4,1,cv.CV_32FC2,new Float32Array([
+  0,0,  SHEET_W,0,  SHEET_W,SHEET_H,  0,SHEET_H
+]));
+const Hmat = cv.getPerspectiveTransform(srcMat, dstMat);
+srcMat.delete(); dstMat.delete();
 
- if (H) { H.delete?.(); H = null; }    // Drum Cal T1
-if (Hinv) { Hinv.delete?.(); Hinv = null; }    // Drum Cal T1
+if (H) { H.delete?.(); H = null; }
+if (Hinv) { Hinv.delete?.(); Hinv = null; }
 
-  H = Hmat;
-  computeHinv(); // Drum Cal T1
-  return true;
+// remember the calibrated overlay corners for inverse build/debug
+lastOverlayCorners = overlayCorners.slice();
+
+// set H (overlay -> sheet)
+H = Hmat;
+
+// build Hinv (sheet -> overlay) by swapping the same 4 points
+const srcSheet = cv.matFromArray(4,1,cv.CV_32FC2,new Float32Array([
+  0,0,  SHEET_W,0,  SHEET_W,SHEET_H,  0,SHEET_H
+]));
+const dstOverlay = cv.matFromArray(4,1,cv.CV_32FC2,new Float32Array([
+  overlayCorners[0].px, overlayCorners[0].py,
+  overlayCorners[1].px, overlayCorners[1].py,
+  overlayCorners[2].px, overlayCorners[2].py,
+  overlayCorners[3].px, overlayCorners[3].py,
+]));
+Hinv = cv.getPerspectiveTransform(srcSheet, dstOverlay);
+srcSheet.delete(); dstOverlay.delete();
+
+// (optional but recommended) quick reprojection quality gate
+const err = rmsReprojError(overlayCorners);  // add helper below
+if (!isFinite(err) || err > 12) {
+  if (H) { H.delete?.(); H = null; }
+  if (Hinv) { Hinv.delete?.(); Hinv = null; }
+  console.warn('Calibration rejected, RMS error px =', err);
+  return false;
+}
+
+return true;
+// Drum Cal T1 End
 }
 // Cal T3 S3 End
 
@@ -250,6 +280,8 @@ const cooldown = new Map();
 const COOLDOWN_MS = 120;
 const VELOCITY_THRESH = 2.0;
 let wasInside = new Map(); // padName -> boolean
+
+
 
 
 function resizeCanvas() {
