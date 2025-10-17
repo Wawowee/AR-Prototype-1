@@ -481,7 +481,33 @@ btnCal.onclick = async () => {
   }
 };
 
+// Reprojection RMS error: overlay -> sheet -> overlay should land back on the 4 corners
+// Drum Cal T1
+function rmsReprojError(overlayPts /* [{px,py} * 4] */) {
+  if (!H || !Hinv || !cvReady) return Infinity;
 
+  // overlay -> sheet
+  const src = cv.matFromArray(
+    4, 1, cv.CV_32FC2,
+    new Float32Array(overlayPts.flatMap(p => [p.px, p.py]))
+  );
+  const mid = new cv.Mat();
+  cv.perspectiveTransform(src, mid, H);
+
+  // sheet -> overlay
+  const back = new cv.Mat();
+  cv.perspectiveTransform(mid, back, Hinv);
+
+  let s = 0;
+  for (let i = 0; i < 4; i++) {
+    const dx = overlayPts[i].px - back.data32F[2*i + 0];
+    const dy = overlayPts[i].py - back.data32F[2*i + 1];
+    s += dx*dx + dy*dy;
+  }
+  src.delete(); mid.delete(); back.delete();
+  return Math.sqrt(s / 4);
+}
+// Drum Cal T1 End
 
 // VIDEO px -> OVERLAY px (same space as fingertip)
 function videoPtToOverlayPx({x, y}) {
@@ -654,13 +680,36 @@ function mapOverlayToSheet(x, y) {
 
 // (Optional) we’ll want H⁻¹ to draw pads in overlay space
 let Hinv = null;
+// Remember we saved these during calibration:
+ // let lastOverlayCorners = null; // [{px,py} x 4] TL,TR,BR,BL
+// Drum Cal T1
 function computeHinv() {
   if (!H || !cvReady) return;
   if (Hinv) Hinv.delete?.();
-  Hinv = new cv.Mat();
-  cv.invert(H, Hinv, cv.DECOMP_LU); // 3x3 inverse
-}
 
+  if (lastOverlayCorners && lastOverlayCorners.length === 4) {
+    const srcSheet = cv.matFromArray(
+      4,1,cv.CV_32FC2,
+      new Float32Array([ 0,0,  SHEET_W,0,  SHEET_W,SHEET_H,  0,SHEET_H ])
+    );
+    const dstOverlay = cv.matFromArray(
+      4,1,cv.CV_32FC2,
+      new Float32Array([
+        lastOverlayCorners[0].px, lastOverlayCorners[0].py,
+        lastOverlayCorners[1].px, lastOverlayCorners[1].py,
+        lastOverlayCorners[2].px, lastOverlayCorners[2].py,
+        lastOverlayCorners[3].px, lastOverlayCorners[3].py
+      ])
+    );
+    Hinv = cv.getPerspectiveTransform(srcSheet, dstOverlay);
+    srcSheet.delete(); dstOverlay.delete();
+  } else {
+    // Fallback only if the corners aren’t available
+    Hinv = new cv.Mat();
+    cv.invert(H, Hinv, cv.DECOMP_LU);
+  }
+}
+// Drum Cal T1 End
 
 async function loop(ts) {
   if (!video.videoWidth || !video.videoHeight) {
