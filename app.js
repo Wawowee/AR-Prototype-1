@@ -272,7 +272,7 @@ function detectSquareBoxesFullRes(src /* CV_8UC4 */) {
     const cnt = contours.get(i);
     const peri = cv.arcLength(cnt, true);
     const approx = new cv.Mat();
-    cv.approxPolyDP(cnt, approx, 0.03 * peri, true);
+    cv.approxPolyDP(cnt, approx, 0.04 * peri, true);
     if (approx.rows === 4 && cv.isContourConvex(approx)) {
       const area = cv.contourArea(approx);
       const af = area / imgArea;
