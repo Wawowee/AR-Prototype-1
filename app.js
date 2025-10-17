@@ -412,7 +412,7 @@ btnCal.onclick = async () => {
         cv.approxPolyDP(c, approx, 0.03*peri, true);
         if (approx.rows===4 && cv.isContourConvex(approx)){
           const area=cv.contourArea(approx), areaFrac=area/imgArea;
-          if (areaFrac>0.0006 && areaFrac<0.25){
+          if (areaFrac>0.0003 && areaFrac<0.25){
             const r=cv.boundingRect(approx), ar=r.width/r.height;
             if (ar>0.55 && ar<1.45){ let cx=0,cy=0;
               for (let j=0;j<4;j++){ cx+=approx.intPtr(j,0)[0]; cy+=approx.intPtr(j,0)[1]; }
