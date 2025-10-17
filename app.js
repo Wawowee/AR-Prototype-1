@@ -156,8 +156,11 @@ function findSquaresAndHomographyFromCurrentFrame(video) {
   const Hmat = cv.getPerspectiveTransform(srcMat, dstMat);
   srcMat.delete(); dstMat.delete();
 
-  if (H) H.delete?.();
+ if (H) { H.delete?.(); H = null; }    // Drum Cal T1
+if (Hinv) { Hinv.delete?.(); Hinv = null; }    // Drum Cal T1
+
   H = Hmat;
+  computeHinv(); // Drum Cal T1
   return true;
 }
 // Cal T3 S3 End
@@ -552,6 +555,28 @@ function renderOverlay(tipPx) {
     ctx.fill();
   }
 }
+// Drum Cal T1
+// Map a single overlay pixel (finger) → sheet coords using H
+function mapOverlayToSheet(x, y) {
+  if (!H || !cvReady) return null;
+  const src = cv.matFromArray(1, 1, cv.CV_32FC2, new Float32Array([x, y]));
+  const dst = new cv.Mat();
+  cv.perspectiveTransform(src, dst, H);
+  const out = { x: dst.data32F[0], y: dst.data32F[1] };
+  src.delete(); dst.delete();
+  return out;
+}
+// Drum Cal T1 End
+
+// (Optional) we’ll want H⁻¹ to draw pads in overlay space
+let Hinv = null;
+function computeHinv() {
+  if (!H || !cvReady) return;
+  if (Hinv) Hinv.delete?.();
+  Hinv = new cv.Mat();
+  cv.invert(H, Hinv, cv.DECOMP_LU); // 3x3 inverse
+}
+
 
 async function loop(ts) {
   if (!video.videoWidth || !video.videoHeight) {
