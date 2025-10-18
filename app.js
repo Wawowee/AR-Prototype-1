@@ -10,7 +10,7 @@
 import { FilesetResolver, HandLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0";
 
 
-window.addEventListener("load", () => console.log("app running(1)"));
+window.addEventListener("load", () => console.log("app running(2)"));
 
 // -----------------------------------------------------------------------------
 // DOM Elements
@@ -41,7 +41,7 @@ const basePads = [
 
 // Convert basePads to screen/top-left sheet coords (single source of truth for draw + hit)
 const TOP_ROW_DY = +6;   // + pushes top row down; - up
-const BOT_ROW_DY = -6;   // + pushes bottom row down; - up
+const BOT_ROW_DY = -10;   // + pushes bottom row down; - up
 
 function padsForScreen() {
   return basePads.map(p => {
