@@ -34,12 +34,12 @@ const OLD_W = 384, OLD_H = 288;
 
 // Base pad layout (defined for the PDF; origin effectively bottom-left)
 const basePads = [
-  { name: "Kick",    x:  64, y:  72, r: 40, sound: "sounds/kick.wav" },
-  { name: "Snare",   x: 192, y:  72, r: 40, sound: "sounds/snare.wav" },
-  { name: "HiHat C", x: 320, y:  72, r: 40, sound: "sounds/hihat_closed.wav" },
-  { name: "Tom",     x:  64, y: 172, r: 40, sound: "sounds/tom.wav" },
-  { name: "Clap",    x: 192, y: 172, r: 40, sound: "sounds/clap.wav" },
-  { name: "HiHat O", x: 320, y: 172, r: 40, sound: "sounds/hihat_open.wav" },
+  { name: "Kick",    x:  64, y:  72, r: 60, sound: "sounds/kick.wav" },
+  { name: "Snare",   x: 192, y:  72, r: 60, sound: "sounds/snare.wav" },
+  { name: "HiHat C", x: 320, y:  72, r: 60, sound: "sounds/hihat_closed.wav" },
+  { name: "Tom",     x:  64, y: 172, r: 60, sound: "sounds/tom.wav" },
+  { name: "Clap",    x: 192, y: 172, r: 60, sound: "sounds/clap.wav" },
+  { name: "HiHat O", x: 320, y: 172, r: 60, sound: "sounds/hihat_open.wav" },
 ];
 
 const basePadsNorm = basePads.map(p => ({
@@ -50,7 +50,7 @@ const basePadsNorm = basePads.map(p => ({
 }));
 
 // Convert basePads to screen/top-left sheet coords (single source of truth for draw + hit)
-const TOP_ROW_DY = -10;   // + pushes top row down; - up
+const TOP_ROW_DY = -25;   // + pushes top row down; - up
 const BOT_ROW_DY = -13;   // + pushes bottom row down; - up
 // scale factors from old (384×288) to new (620×400)
 const SX = 620 / 384;
