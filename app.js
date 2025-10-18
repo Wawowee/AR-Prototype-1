@@ -10,7 +10,7 @@
 import { FilesetResolver, HandLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0";
 
 
-window.addEventListener("load", () => console.log("app running(2)"));
+window.addEventListener("load", () => console.log("app running(3)"));
 
 // -----------------------------------------------------------------------------
 // DOM Elements
@@ -28,6 +28,14 @@ const cbMirror = document.getElementById('cbMirror'); // unchecked by default
 // -----------------------------------------------------------------------------
 const SHEET_W = 620, SHEET_H = 400;
 const PAD_SCALE = 1.53;
+const OLD_W = 384, OLD_H = 288;
+const basePadsNorm = basePads.map(p => ({
+  ...p,
+  fx: p.x / OLD_W, // fraction of width
+  fy: p.y / OLD_H, // fraction of height (BL origin)
+  fr: p.r / OLD_W  // radius as fraction of width (matches our PDF design choice)
+}));
+
 
 // Base pad layout (defined for the PDF; origin effectively bottom-left)
 const basePads = [
@@ -48,26 +56,26 @@ const SY = 400 / 288;
 const SR = SX; // use width for circle radius scaling
 
 function padsForScreen() {
-  return basePads.map(p => {
-    // scale pad center from old BL-origin sheet into the new sheet
-    const xScaledBL = p.x * SX;
-    const yScaledBL = p.y * SY;
+  return basePadsNorm.map(p => {
+    // rebuild center in current sheet (BL origin -> TL origin)
+    const xBL = p.fx * SHEET_W;
+    const yBL = p.fy * SHEET_H;
+    let yTL   = SHEET_H - yBL;
 
-    // flip Y to top-left origin in the new sheet space
-    let yTL = SHEET_H - yScaledBL;
-
-    // keep your per-row nudges (decide "top row" in BL-origin AFTER scaling)
-    const isTopRow = yScaledBL > (SHEET_H / 2);
+    // (keep your per-row micro-nudges, which are in sheet pixels)
+    const isTopRow = yBL > (SHEET_H / 2);  // compare in BL origin
     yTL += isTopRow ? TOP_ROW_DY : BOT_ROW_DY;
 
     return {
       ...p,
-      x: xScaledBL,
+      x: xBL,
       y: yTL,
-      r: Math.round(p.r * SR * PAD_SCALE)
+      // radius from width fraction, then your global size tweak
+      r: Math.round(p.fr * SHEET_W * PAD_SCALE)
     };
   });
 }
+
 
 
 
