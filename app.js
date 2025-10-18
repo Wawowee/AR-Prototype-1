@@ -26,7 +26,7 @@ const cbMirror = document.getElementById('cbMirror'); // unchecked by default
 // -----------------------------------------------------------------------------
 // Constants: Sheet coordinate space & Pads
 // -----------------------------------------------------------------------------
-const SHEET_W = 382, SHEET_H = 288;
+const SHEET_W = 384, SHEET_H = 286;
 const PAD_SCALE = 1.54;
 
 // Base pad layout (defined for the PDF; origin effectively bottom-left)
