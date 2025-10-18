@@ -9,6 +9,9 @@
 // -----------------------------------------------------------------------------
 import { FilesetResolver, HandLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0";
 
+
+window.addEventListener("load", () => console.log("app running()"));
+
 // -----------------------------------------------------------------------------
 // DOM Elements
 // -----------------------------------------------------------------------------
