@@ -510,9 +510,34 @@ function findSquaresAndHomographyFromCurrentFrame(video) {
     return best; // VIDEO px
   }
 
-  const videoCorners   = four.map(outwardVertex);
-  const orderedVideo   = orderTLTRBRBLBySumDiff(videoCorners); // TL,TR,BR,BL
-  const overlayCorners = orderedVideo.map(({x,y}) => videoPtToOverlayPx({x,y}));
+// ✅ new approach: build a rectangle that hugs the circle area on the paper
+
+// 1) Split the 4 detected squares into left/right and top/bottom groups
+const left  = four.reduce((a,b) => (a.cx < b.cx ? a : b));
+const right = four.reduce((a,b) => (a.cx > b.cx ? a : b));
+const top2  = four.slice().sort((a,b) => a.cy - b.cy).slice(0, 2); // smaller cy = nearer top of image
+const bot2  = four.slice().sort((a,b) => b.cy - a.cy).slice(0, 2); // larger cy = nearer bottom
+
+// 2) Utilities to read extreme edges from the rotated boxes
+const minX = sq => Math.min(...sq.box.map(v => v.x)); // left edge of that square
+const maxX = sq => Math.max(...sq.box.map(v => v.x)); // right edge
+const bottomMostY = boxes => Math.max(...boxes.flatMap(sq => sq.box.map(v => v.y))); // lower edge (bigger y)
+const topMostY    = boxes => Math.min(...boxes.flatMap(sq => sq.box.map(v => v.y))); // upper edge (smaller y)
+
+// 3) Edges of the circle bounding rectangle in the video frame
+const xL   = minX(left);               // left boundary = left square’s left edge
+const xR   = maxX(right);              // right boundary = right square’s right edge
+const yTop = bottomMostY(top2);        // top boundary = bottom edge of the top squares
+const yBot = topMostY(bot2);           // bottom boundary = top edge of the bottom squares
+
+// 4) These are your 4 overlay-space calibration corners (TL, TR, BR, BL)
+const overlayCorners = [
+  { px: xL,   py: yTop },
+  { px: xR,   py: yTop },
+  { px: xR,   py: yBot },
+  { px: xL,   py: yBot }
+].map(({px,py}) => videoPtToOverlayPx({ x: px, y: py }));
+
 
   // Build H (overlay -> sheet)
   const srcMat = cv.matFromArray(4,1,cv.CV_32FC2,new Float32Array([
