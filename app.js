@@ -10,7 +10,7 @@
 import { FilesetResolver, HandLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0";
 
 
-window.addEventListener("load", () => console.log("app running()"));
+window.addEventListener("load", () => console.log("app running(1)"));
 
 // -----------------------------------------------------------------------------
 // DOM Elements
@@ -43,7 +43,7 @@ const basePads = [
 function padsForScreen() {
     return basePads.map(p => ({
     ...p,
-    y: (SHEET_H - p.y),
+    y: (SHEET_H - p.y - 10),
     r: Math.round(p.r * PAD_SCALE)
   }));
 }
