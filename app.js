@@ -10,7 +10,7 @@
 import { FilesetResolver, HandLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0";
 
 
-window.addEventListener("load", () => console.log("app running(1)"));
+window.addEventListener("load", () => console.log("app running(2)"));
 
 // -----------------------------------------------------------------------------
 // DOM Elements
@@ -36,7 +36,7 @@ const Y_BOT_FRAC = 0.2875;            // BL-origin (bottom row)
 const R_FRAC     = 0.85 / 6.2;        // circle radius as fraction of width
 
 // Micro alignment (in sheet pixels, TL-origin after flip)
-const TOP_ROW_DY = 0;               // + moves top row down; - up
+const TOP_ROW_DY = -2;               // + moves top row down; - up
 const BOT_ROW_DY = 0;               // + moves bottom row down; - up
 
 // Keep sounds exactly as-is; we’ll ignore x/y/r here and compute geometry per name.
