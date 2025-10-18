@@ -10,7 +10,7 @@
 import { FilesetResolver, HandLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0";
 
 
-window.addEventListener("load", () => console.log("app running()"));
+window.addEventListener("load", () => console.log("app running(1)"));
 
 // -----------------------------------------------------------------------------
 // DOM Elements
@@ -38,6 +38,7 @@ const R_FRAC     = 0.85 / 6.2;        // circle radius as fraction of width
 // Micro alignment (in sheet pixels, TL-origin after flip)
 const TOP_ROW_DY = -22;               // + moves top row down; - up
 const BOT_ROW_DY = 0;               // + moves bottom row down; - up
+const COL_DX = [-6, 0, 0];         // make more negative to move further left
 
 // Keep sounds exactly as-is; we’ll ignore x/y/r here and compute geometry per name.
 const basePads = [
@@ -64,7 +65,7 @@ function padsForScreen() {
   const r = Math.round(SHEET_W * R_FRAC * PAD_SCALE);
   return basePads.map(p => {
     const [ci, row] = PAD_INDEX[p.name];
-    const x = Math.round(SHEET_W * X_FRACS[ci]);
+    const x = Math.round(SHEET_W * X_FRACS[ci]) + COL_DX[ci];
 
     // build BL-origin y from fraction, then flip to TL-origin
     const yBL = Math.round(SHEET_H * (row === "top" ? Y_TOP_FRAC : Y_BOT_FRAC));
