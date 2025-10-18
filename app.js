@@ -26,8 +26,8 @@ const cbMirror = document.getElementById('cbMirror'); // unchecked by default
 // -----------------------------------------------------------------------------
 // Constants: Sheet coordinate space & Pads
 // -----------------------------------------------------------------------------
-const SHEET_W = 384, SHEET_H = 300;
-const PAD_SCALE = 1.54;
+const SHEET_W = 384, SHEET_H = 288;
+const PAD_SCALE = 1.53;
 
 // Base pad layout (defined for the PDF; origin effectively bottom-left)
 const basePads = [
@@ -40,13 +40,23 @@ const basePads = [
 ];
 
 // Convert basePads to screen/top-left sheet coords (single source of truth for draw + hit)
+const TOP_ROW_DY = +6;   // + pushes top row down; - up
+const BOT_ROW_DY = -6;   // + pushes bottom row down; - up
+
 function padsForScreen() {
-    return basePads.map(p => ({
-    ...p,
-    y: (SHEET_H - p.y),
-    r: Math.round(p.r * PAD_SCALE)
-  }));
+  return basePads.map(p => {
+    let yTL = SHEET_H - p.y;                     // flip
+    const isTopRow = p.y > SHEET_H / 2;          // basePads uses bottom-left origin
+    yTL += isTopRow ? TOP_ROW_DY : BOT_ROW_DY;   // nudge per row
+
+    return {
+      ...p,
+      y: yTL,
+      r: Math.round(p.r * PAD_SCALE)
+    };
+  });
 }
+
 
 // -----------------------------------------------------------------------------
 // Runtime State (audio, hands, hit-test)
