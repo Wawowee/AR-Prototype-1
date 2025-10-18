@@ -197,7 +197,7 @@ function videoPtToOverlayPx({x, y}) {
 let cvReady = false;
 let cvLoadPromise = null;
 
-export async function loadOpenCVOnce() {
+async function loadOpenCVOnce() {
   if (cvReady) return;
   if (cvLoadPromise) return cvLoadPromise;
 
@@ -247,12 +247,6 @@ export async function loadOpenCVOnce() {
   return cvLoadPromise;
 }
 
-// Hidden work canvas (kept for completeness; not added to DOM)
-const work = document.createElement('canvas');
-work.width  = 1280;
-work.height = 720;
-const wctx = work.getContext('2d', { willReadFrequently: true });
-
 // -----------------------------------------------------------------------------
 // Calibration: Homography overlay<->sheet + helpers
 // -----------------------------------------------------------------------------
@@ -301,32 +295,6 @@ function mapOverlayToSheet(x, y) {
   return out;
 }
 
-// Compute Hinv (prefers robust rebuild using lastOverlayCorners; fallback to invert)
-function computeHinv() {
-  if (!H || !cvReady) return;
-  if (Hinv) Hinv.delete?.();
-
-  if (lastOverlayCorners && lastOverlayCorners.length === 4) {
-    const srcSheet = cv.matFromArray(
-      4,1,cv.CV_32FC2,
-      new Float32Array([ 0,0,  SHEET_W,0,  SHEET_W,SHEET_H,  0,SHEET_H ])
-    );
-    const dstOverlay = cv.matFromArray(
-      4,1,cv.CV_32FC2,
-      new Float32Array([
-        lastOverlayCorners[0].px, lastOverlayCorners[0].py,
-        lastOverlayCorners[1].px, lastOverlayCorners[1].py,
-        lastOverlayCorners[2].px, lastOverlayCorners[2].py,
-        lastOverlayCorners[3].px, lastOverlayCorners[3].py
-      ])
-    );
-    Hinv = cv.getPerspectiveTransform(srcSheet, dstOverlay);
-    srcSheet.delete(); dstOverlay.delete();
-  } else {
-    Hinv = new cv.Mat();
-    cv.invert(H, Hinv, cv.DECOMP_LU);
-  }
-}
 
 // Reprojection RMS error: overlay -> sheet -> overlay should land back on the 4 corners
 function rmsReprojError(overlayPts /* [{px,py} * 4] */) {
