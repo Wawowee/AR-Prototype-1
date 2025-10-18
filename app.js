@@ -10,7 +10,7 @@
 import { FilesetResolver, HandLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0";
 
 
-window.addEventListener("load", () => console.log("app running(3)"));
+window.addEventListener("load", () => console.log("app running()"));
 
 // -----------------------------------------------------------------------------
 // DOM Elements
@@ -30,13 +30,13 @@ const SHEET_W = 620, SHEET_H = 400;   // 6.2" x 4.0" logical space (any 1.55:1 w
 const PAD_SCALE = 1;                  // tweak overall size if needed
 
 // PDF geometry (fractions of layout)
-const X_FRACS = [1/6, 3/6, 5/6];      // columns
+const X_FRACS = [5/24, 3/6, 5/6];      // columns
 const Y_TOP_FRAC = 0.7125;            // BL-origin (top row)
 const Y_BOT_FRAC = 0.2875;            // BL-origin (bottom row)
 const R_FRAC     = 0.85 / 6.2;        // circle radius as fraction of width
 
 // Micro alignment (in sheet pixels, TL-origin after flip)
-const TOP_ROW_DY = -30;               // + moves top row down; - up
+const TOP_ROW_DY = -22;               // + moves top row down; - up
 const BOT_ROW_DY = 0;               // + moves bottom row down; - up
 
 // Keep sounds exactly as-is; we’ll ignore x/y/r here and compute geometry per name.
