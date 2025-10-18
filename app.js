@@ -24,59 +24,59 @@ const btnCal   = document.getElementById('btnCal');
 const cbMirror = document.getElementById('cbMirror'); // unchecked by default
 
 // -----------------------------------------------------------------------------
-// Constants: Sheet coordinate space & Pads
+// Constants: Sheet coordinate space & Pads (clean + PDF-accurate)
 // -----------------------------------------------------------------------------
-const SHEET_W = 620, SHEET_H = 400;
-const PAD_SCALE = 1;
-const OLD_W = 384, OLD_H = 288;
+const SHEET_W = 620, SHEET_H = 400;   // 6.2" x 4.0" logical space (any 1.55:1 works)
+const PAD_SCALE = 1;                  // tweak overall size if needed
 
+// PDF geometry (fractions of layout)
+const X_FRACS = [1/6, 3/6, 5/6];      // columns
+const Y_TOP_FRAC = 0.7125;            // BL-origin (top row)
+const Y_BOT_FRAC = 0.2875;            // BL-origin (bottom row)
+const R_FRAC     = 0.85 / 6.2;        // circle radius as fraction of width
 
+// Micro alignment (in sheet pixels, TL-origin after flip)
+const TOP_ROW_DY = -25;               // + moves top row down; - up
+const BOT_ROW_DY = -13;               // + moves bottom row down; - up
 
-// Base pad layout (defined for the PDF; origin effectively bottom-left)
+// Keep sounds exactly as-is; we’ll ignore x/y/r here and compute geometry per name.
 const basePads = [
-  { name: "Kick",    x:  64, y:  72, r: 60, sound: "sounds/kick.wav" },
-  { name: "Snare",   x: 192, y:  72, r: 60, sound: "sounds/snare.wav" },
-  { name: "HiHat C", x: 320, y:  72, r: 60, sound: "sounds/hihat_closed.wav" },
-  { name: "Tom",     x:  64, y: 172, r: 60, sound: "sounds/tom.wav" },
-  { name: "Clap",    x: 192, y: 172, r: 60, sound: "sounds/clap.wav" },
-  { name: "HiHat O", x: 320, y: 172, r: 60, sound: "sounds/hihat_open.wav" },
+  { name: "Kick",    sound: "sounds/kick.wav" },
+  { name: "Snare",   sound: "sounds/snare.wav" },
+  { name: "HiHat C", sound: "sounds/hihat_closed.wav" },
+  { name: "Tom",     sound: "sounds/tom.wav" },
+  { name: "Clap",    sound: "sounds/clap.wav" },
+  { name: "HiHat O", sound: "sounds/hihat_open.wav" },
 ];
 
-const basePadsNorm = basePads.map(p => ({
-  ...p,
-  fx: p.x / OLD_W, // fraction of width
-  fy: p.y / OLD_H, // fraction of height (BL origin)
-  fr: p.r / OLD_W  // radius as fraction of width (matches our PDF design choice)
-}));
+// Map names to (column index, row tag)
+const PAD_INDEX = {
+  "Tom":     [0, "top"],
+  "Clap":    [1, "top"],
+  "HiHat O": [2, "top"],
+  "Kick":    [0, "bot"],
+  "Snare":   [1, "bot"],
+  "HiHat C": [2, "bot"],
+};
 
-// Convert basePads to screen/top-left sheet coords (single source of truth for draw + hit)
-const TOP_ROW_DY = -25;   // + pushes top row down; - up
-const BOT_ROW_DY = -13;   // + pushes bottom row down; - up
-// scale factors from old (384×288) to new (620×400)
-const SX = 620 / 384;
-const SY = 400 / 288;
-const SR = SX; // use width for circle radius scaling
-
+// Single source of truth for draw + hit-test (top-left sheet coords)
 function padsForScreen() {
-  return basePadsNorm.map(p => {
-    // rebuild center in current sheet (BL origin -> TL origin)
-    const xBL = p.fx * SHEET_W;
-    const yBL = p.fy * SHEET_H;
-    let yTL   = SHEET_H - yBL;
+  const r = Math.round(SHEET_W * R_FRAC * PAD_SCALE);
+  return basePads.map(p => {
+    const [ci, row] = PAD_INDEX[p.name];
+    const x = Math.round(SHEET_W * X_FRACS[ci]);
 
-    // (keep your per-row micro-nudges, which are in sheet pixels)
-    const isTopRow = yBL > (SHEET_H / 2);  // compare in BL origin
-    yTL += isTopRow ? TOP_ROW_DY : BOT_ROW_DY;
+    // build BL-origin y from fraction, then flip to TL-origin
+    const yBL = Math.round(SHEET_H * (row === "top" ? Y_TOP_FRAC : Y_BOT_FRAC));
+    let yTL = SHEET_H - yBL;
 
-    return {
-      ...p,
-      x: xBL,
-      y: yTL,
-      // radius from width fraction, then your global size tweak
-      r: Math.round(p.fr * SHEET_W * PAD_SCALE)
-    };
+    // per-row micro-nudges
+    yTL += (row === "top" ? TOP_ROW_DY : BOT_ROW_DY);
+
+    return { ...p, x, y: yTL, r };
   });
 }
+
 
 
 
