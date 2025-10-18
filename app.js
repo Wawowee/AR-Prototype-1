@@ -26,7 +26,7 @@ const cbMirror = document.getElementById('cbMirror'); // unchecked by default
 // -----------------------------------------------------------------------------
 // Constants: Sheet coordinate space & Pads
 // -----------------------------------------------------------------------------
-const SHEET_W = 384, SHEET_H = 288;
+const SHEET_W = 620, SHEET_H = 400;
 const PAD_SCALE = 1.53;
 
 // Base pad layout (defined for the PDF; origin effectively bottom-left)
@@ -42,20 +42,33 @@ const basePads = [
 // Convert basePads to screen/top-left sheet coords (single source of truth for draw + hit)
 const TOP_ROW_DY = +6;   // + pushes top row down; - up
 const BOT_ROW_DY = -10;   // + pushes bottom row down; - up
+// scale factors from old (384×288) to new (620×400)
+const SX = 620 / 384;
+const SY = 400 / 288;
+const SR = SX; // use width for circle radius scaling
 
 function padsForScreen() {
   return basePads.map(p => {
-    let yTL = SHEET_H - p.y;                     // flip
-    const isTopRow = p.y > SHEET_H / 2;          // basePads uses bottom-left origin
-    yTL += isTopRow ? TOP_ROW_DY : BOT_ROW_DY;   // nudge per row
+    // scale pad center from old BL-origin sheet into the new sheet
+    const xScaledBL = p.x * SX;
+    const yScaledBL = p.y * SY;
+
+    // flip Y to top-left origin in the new sheet space
+    let yTL = SHEET_H - yScaledBL;
+
+    // keep your per-row nudges (decide "top row" in BL-origin AFTER scaling)
+    const isTopRow = yScaledBL > (SHEET_H / 2);
+    yTL += isTopRow ? TOP_ROW_DY : BOT_ROW_DY;
 
     return {
       ...p,
+      x: xScaledBL,
       y: yTL,
-      r: Math.round(p.r * PAD_SCALE)
+      r: Math.round(p.r * SR * PAD_SCALE)
     };
   });
 }
+
 
 
 // -----------------------------------------------------------------------------
