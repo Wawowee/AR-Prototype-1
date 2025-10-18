@@ -24,6 +24,7 @@ const cbMirror = document.getElementById('cbMirror'); // unchecked by default
 // Constants: Sheet coordinate space & Pads
 // -----------------------------------------------------------------------------
 const SHEET_W = 384, SHEET_H = 288;
+const PAD_SCALE = 1.56;
 
 // Base pad layout (defined for the PDF; origin effectively bottom-left)
 const basePads = [
@@ -37,7 +38,11 @@ const basePads = [
 
 // Convert basePads to screen/top-left sheet coords (single source of truth for draw + hit)
 function padsForScreen() {
-  return basePads.map(p => ({ ...p, y: (SHEET_H - p.y) }));
+    return basePads.map(p => ({
+    ...p,
+    y: (SHEET_H - p.y),
+    r: Math.round(p.r * PAD_SCALE)
+  }));
 }
 
 // -----------------------------------------------------------------------------
