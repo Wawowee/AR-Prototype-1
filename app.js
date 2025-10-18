@@ -31,12 +31,12 @@ const PAD_SCALE = 1.54;
 
 // Base pad layout (defined for the PDF; origin effectively bottom-left)
 const basePads = [
-  { name: "Kick",    x:  64, y:  72, r: 34, sound: "sounds/kick.wav" },
-  { name: "Snare",   x: 192, y:  72, r: 34, sound: "sounds/snare.wav" },
-  { name: "HiHat C", x: 320, y:  72, r: 30, sound: "sounds/hihat_closed.wav" },
+  { name: "Kick",    x:  64, y:  72, r: 32, sound: "sounds/kick.wav" },
+  { name: "Snare",   x: 192, y:  72, r: 32, sound: "sounds/snare.wav" },
+  { name: "HiHat C", x: 320, y:  72, r: 32, sound: "sounds/hihat_closed.wav" },
   { name: "Tom",     x:  64, y: 172, r: 32, sound: "sounds/tom.wav" },
   { name: "Clap",    x: 192, y: 172, r: 32, sound: "sounds/clap.wav" },
-  { name: "HiHat O", x: 320, y: 172, r: 30, sound: "sounds/hihat_open.wav" },
+  { name: "HiHat O", x: 320, y: 172, r: 32, sound: "sounds/hihat_open.wav" },
 ];
 
 // Convert basePads to screen/top-left sheet coords (single source of truth for draw + hit)
