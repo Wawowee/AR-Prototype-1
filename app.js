@@ -10,7 +10,7 @@
 import { FilesetResolver, HandLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0";
 
 
-window.addEventListener("load", () => console.log("app running()"));
+window.addEventListener("load", () => console.log("app running(2)"));
 
 // -----------------------------------------------------------------------------
 // DOM Elements
@@ -26,7 +26,7 @@ const cbMirror = document.getElementById('cbMirror'); // unchecked by default
 // -----------------------------------------------------------------------------
 // Constants: Sheet coordinate space & Pads
 // -----------------------------------------------------------------------------
-const SHEET_W = 384, SHEET_H = 288;
+const SHEET_W = 382, SHEET_H = 288;
 const PAD_SCALE = 1.54;
 
 // Base pad layout (defined for the PDF; origin effectively bottom-left)
