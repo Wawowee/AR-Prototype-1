@@ -24,16 +24,16 @@ const cbMirror = document.getElementById('cbMirror'); // unchecked by default
 // Constants: Sheet coordinate space & Pads
 // -----------------------------------------------------------------------------
 const SHEET_W = 384, SHEET_H = 288;
-const PAD_SCALE = 1.55;
+const PAD_SCALE = 1.54;
 
 // Base pad layout (defined for the PDF; origin effectively bottom-left)
 const basePads = [
-  { name: "Kick",    x:  64, y:  64, r: 34, sound: "sounds/kick.wav" },
-  { name: "Snare",   x: 192, y:  64, r: 34, sound: "sounds/snare.wav" },
-  { name: "HiHat C", x: 320, y:  64, r: 30, sound: "sounds/hihat_closed.wav" },
-  { name: "Tom",     x:  64, y: 180, r: 32, sound: "sounds/tom.wav" },
-  { name: "Clap",    x: 192, y: 180, r: 32, sound: "sounds/clap.wav" },
-  { name: "HiHat O", x: 320, y: 180, r: 30, sound: "sounds/hihat_open.wav" },
+  { name: "Kick",    x:  64, y:  67, r: 34, sound: "sounds/kick.wav" },
+  { name: "Snare",   x: 192, y:  67, r: 34, sound: "sounds/snare.wav" },
+  { name: "HiHat C", x: 320, y:  67, r: 30, sound: "sounds/hihat_closed.wav" },
+  { name: "Tom",     x:  64, y: 178, r: 32, sound: "sounds/tom.wav" },
+  { name: "Clap",    x: 192, y: 178, r: 32, sound: "sounds/clap.wav" },
+  { name: "HiHat O", x: 320, y: 178, r: 30, sound: "sounds/hihat_open.wav" },
 ];
 
 // Convert basePads to screen/top-left sheet coords (single source of truth for draw + hit)
