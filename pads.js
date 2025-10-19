@@ -1,37 +1,91 @@
-// app.js
-// Minimal demo using utils. Works in a browser with <script type="module">,
-// or in Node 18+ with `node --experimental-modules` or native ESM.
+import { SHEET_W, SHEET_H, overlay, video, cbMirror } from './state.js';
 
-import { clamp, lerp, debounce, randomInt, toRadians } from './utils.js';
+// PDF geometry (fractions)
+const PAD_SCALE = 1;                       // keep your tweak
+const X_FRACS = [5/24, 3/6, 5/6];          // your final tuned columns
+const Y_TOP_FRAC = 0.7125;                 // BL-origin (top row)
+const Y_BOT_FRAC = 0.2875;                 // BL-origin (bottom row)
+const R_FRAC     = 0.85 / 6.2;             // radius as fraction of width
 
-// Simple demo: animate a value in the console between 0 and 100.
-let t = 0;
-let dir = 1;
+// Micro alignment
+const TOP_ROW_DY = -22;
+const BOT_ROW_DY = 0;
+const COL_DX     = [-8, 0, 0];
 
-const tick = () => {
-  t += 0.02 * dir;
-  if (t >= 1 || t <= 0) dir *= -1;
-  const value = Math.round(lerp(0, 100, t));
-  const clamped = clamp(value, 10, 90);
-  const angle = toRadians(value);
-  console.log(`value=${value} clamped=${clamped} rand=${randomInt(1,6)} angle(rad)=${angle.toFixed(2)}`);
+// Names + sounds only
+export const basePads = [
+  { name: "Kick",    sound: "sounds/kick.wav" },
+  { name: "Snare",   sound: "sounds/snare.wav" },
+  { name: "HiHat C", sound: "sounds/hihat_closed.wav" },
+  { name: "Tom",     sound: "sounds/tom.wav" },
+  { name: "Clap",    sound: "sounds/clap.wav" },
+  { name: "HiHat O", sound: "sounds/hihat_open.wav" },
+];
+
+// Map names → (column index, row)
+const PAD_INDEX = {
+  "Tom":     [0, "top"],
+  "Clap":    [1, "top"],
+  "HiHat O": [2, "top"],
+  "Kick":    [0, "bot"],
+  "Snare":   [1, "bot"],
+  "HiHat C": [2, "bot"],
 };
 
-// Use debounce to limit how often we log a "resized" message (browser only).
-const onResize = debounce(() => console.log('resized!'), 250);
-if (typeof window !== 'undefined') {
-  window.addEventListener('resize', onResize);
+// Single source of truth (top-left sheet coords)
+export function padsForScreen() {
+  const r = Math.round(SHEET_W * R_FRAC * PAD_SCALE);
+  return basePads.map(p => {
+    const [ci, row] = PAD_INDEX[p.name];
+    const x = Math.round(SHEET_W * X_FRACS[ci]) + COL_DX[ci];
+    const yBL = Math.round(SHEET_H * (row === "top" ? Y_TOP_FRAC : Y_BOT_FRAC));
+    let yTL = SHEET_H - yBL;
+    yTL += (row === "top" ? TOP_ROW_DY : BOT_ROW_DY);
+    return { ...p, x, y: yTL, r };
+  });
 }
 
-// Start a tiny loop (works in Node and browser). Stop after ~3 seconds.
-const interval = setInterval(tick, 50);
-setTimeout(() => {
-  clearInterval(interval);
-  console.log('Demo done.');
-  if (typeof window !== 'undefined') {
-    window.removeEventListener('resize', onResize);
-  }
-}, 3000);
+// ---------- overlay/video mapping helpers (unchanged logic) ----------
+function getCoverMapping(overlayW, overlayH, videoW, videoH) {
+  const scale    = Math.max(overlayW / videoW, overlayH / videoH);
+  const displayW = videoW * scale;
+  const displayH = videoH * scale;
+  const offsetX  = (overlayW - displayW) / 2;
+  const offsetY  = (overlayH - displayH) / 2;
+  return { displayW, displayH, offsetX, offsetY };
+}
 
-// Export something just to show dual usage.
-export const demoRunning = true;
+export function tipToOverlayPx(tipNormX, tipNormY) {
+  const overlayW = overlay.width;
+  const overlayH = overlay.height;
+  const videoW   = video.videoWidth || overlayW;
+  const videoH   = video.videoHeight || overlayH;
+
+  const { displayW, displayH, offsetX, offsetY } =
+    getCoverMapping(overlayW, overlayH, videoW, videoH);
+
+  const nx = cbMirror.checked ? (1 - tipNormX) : tipNormX;
+  const ny = tipNormY;
+
+  return { px: offsetX + nx * displayW, py: offsetY + ny * displayH };
+}
+
+export function overlayPxToSheet(px, py) {
+  const u = px / overlay.width;
+  const v = py / overlay.height;
+  return { x: u * SHEET_W, y: v * SHEET_H };
+}
+
+export function videoPtToOverlayPx({x, y}) {
+  const overlayW = overlay.width, overlayH = overlay.height;
+  const videoW   = video.videoWidth || overlayW;
+  const videoH   = video.videoHeight || overlayH;
+
+  const { displayW, displayH, offsetX, offsetY } =
+    getCoverMapping(overlayW, overlayH, videoW, videoH);
+
+  const nx = cbMirror.checked ? (1 - x / videoW) : (x / videoW);
+  const ny = y / videoH;
+
+  return { px: offsetX + nx * displayW, py: offsetY + ny * displayH };
+}
