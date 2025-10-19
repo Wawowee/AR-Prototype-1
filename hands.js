@@ -1,37 +1,15 @@
-// app.js
-// Minimal demo using utils. Works in a browser with <script type="module">,
-// or in Node 18+ with `node --experimental-modules` or native ESM.
+import { setHandLandmarker } from './state.js';
+const MP_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0";
 
-import { clamp, lerp, debounce, randomInt, toRadians } from './utils.js';
-
-// Simple demo: animate a value in the console between 0 and 100.
-let t = 0;
-let dir = 1;
-
-const tick = () => {
-  t += 0.02 * dir;
-  if (t >= 1 || t <= 0) dir *= -1;
-  const value = Math.round(lerp(0, 100, t));
-  const clamped = clamp(value, 10, 90);
-  const angle = toRadians(value);
-  console.log(`value=${value} clamped=${clamped} rand=${randomInt(1,6)} angle(rad)=${angle.toFixed(2)}`);
-};
-
-// Use debounce to limit how often we log a "resized" message (browser only).
-const onResize = debounce(() => console.log('resized!'), 250);
-if (typeof window !== 'undefined') {
-  window.addEventListener('resize', onResize);
+export async function initHands() {
+  const { FilesetResolver, HandLandmarker } = await import(`${MP_URL}`);
+  const filesetResolver = await FilesetResolver.forVisionTasks(`${MP_URL}/wasm`);
+  const lm = await HandLandmarker.createFromOptions(filesetResolver, {
+    baseOptions: {
+      modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
+    },
+    numHands: 1,
+    runningMode: "VIDEO"
+  });
+  setHandLandmarker(lm);
 }
-
-// Start a tiny loop (works in Node and browser). Stop after ~3 seconds.
-const interval = setInterval(tick, 50);
-setTimeout(() => {
-  clearInterval(interval);
-  console.log('Demo done.');
-  if (typeof window !== 'undefined') {
-    window.removeEventListener('resize', onResize);
-  }
-}, 3000);
-
-// Export something just to show dual usage.
-export const demoRunning = true;
