@@ -1,37 +1,73 @@
-// app.js
-// Minimal demo using utils. Works in a browser with <script type="module">,
-// or in Node 18+ with `node --experimental-modules` or native ESM.
+import { SHEET_W, SHEET_H, ctx, overlay, cvReady, Hinv } from './state.js';
+import { padsForScreen } from './pads.js';
 
-import { clamp, lerp, debounce, randomInt, toRadians } from './utils.js';
+export function drawPadsProjected() {
+  if (!Hinv || !cvReady) return;
 
-// Simple demo: animate a value in the console between 0 and 100.
-let t = 0;
-let dir = 1;
+  const project = (sx, sy) => {
+    const src = cv.matFromArray(1,1,cv.CV_32FC2,new Float32Array([sx, sy]));
+    const dst = new cv.Mat(); cv.perspectiveTransform(src, dst, Hinv);
+    const out = { x: dst.data32F[0], y: dst.data32F[1] };
+    src.delete(); dst.delete();
+    return out;
+    };
 
-const tick = () => {
-  t += 0.02 * dir;
-  if (t >= 1 || t <= 0) dir *= -1;
-  const value = Math.round(lerp(0, 100, t));
-  const clamped = clamp(value, 10, 90);
-  const angle = toRadians(value);
-  console.log(`value=${value} clamped=${clamped} rand=${randomInt(1,6)} angle(rad)=${angle.toFixed(2)}`);
-};
+  const padsTL = padsForScreen();
+  ctx.save();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "rgba(0,170,255,0.95)";
+  ctx.fillStyle   = "rgba(0,170,255,0.95)";
+  ctx.font = "12px system-ui";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
 
-// Use debounce to limit how often we log a "resized" message (browser only).
-const onResize = debounce(() => console.log('resized!'), 250);
-if (typeof window !== 'undefined') {
-  window.addEventListener('resize', onResize);
+  const SEG = 40;
+  for (const p of padsTL) {
+    ctx.beginPath();
+    for (let i = 0; i <= SEG; i++) {
+      const t = (i / SEG) * Math.PI * 2;
+      const sx = p.x + p.r * Math.cos(t);
+      const sy = p.y + p.r * Math.sin(t);
+      const { x, y } = project(sx, sy);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    const c = project(p.x, p.y);
+    ctx.fillText(p.name, c.x, c.y);
+  }
+  ctx.restore();
 }
 
-// Start a tiny loop (works in Node and browser). Stop after ~3 seconds.
-const interval = setInterval(tick, 50);
-setTimeout(() => {
-  clearInterval(interval);
-  console.log('Demo done.');
-  if (typeof window !== 'undefined') {
-    window.removeEventListener('resize', onResize);
-  }
-}, 3000);
+export function renderOverlay(tipPx) {
+  ctx.clearRect(0, 0, overlay.width, overlay.height);
 
-// Export something just to show dual usage.
-export const demoRunning = true;
+  if (Hinv && cvReady) {
+    drawPadsProjected();
+  } else {
+    const pads = padsForScreen();
+    const sx = overlay.width  / SHEET_W;
+    const sy = overlay.height / SHEET_H;
+
+    ctx.lineWidth = 2;
+    for (const p of pads) {
+      ctx.beginPath();
+      ctx.arc(p.x * sx, p.y * sy, p.r * ((sx + sy) / 2), 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(255,255,255,0.85)";
+      ctx.stroke();
+
+      ctx.font = "12px system-ui";
+      ctx.fillStyle = "rgba(255,255,255,0.9)";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(p.name, p.x * sx, p.y * sy);
+    }
+  }
+
+  if (tipPx) {
+    ctx.beginPath();
+    ctx.arc(tipPx.px, tipPx.py, 7, 0, Math.PI*2);
+    ctx.fillStyle = "rgba(0,200,255,0.95)";
+    ctx.fill();
+  }
+}
