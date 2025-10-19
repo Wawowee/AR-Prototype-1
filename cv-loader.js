@@ -1,5 +1,5 @@
 import { setCvReady } from './state.js';
-window.addEventListener("load", () => console.log("app running(2)"));
+window.addEventListener("load", () => console.log("app running(3)"));
 let cvLoadPromise = null;
 
 export async function loadOpenCVOnce() {
