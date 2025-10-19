@@ -1,37 +1,38 @@
-// app.js
-// Minimal demo using utils. Works in a browser with <script type="module">,
-// or in Node 18+ with `node --experimental-modules` or native ESM.
+import { setCvReady } from './state.js';
 
-import { clamp, lerp, debounce, randomInt, toRadians } from './utils.js';
+let cvLoadPromise = null;
 
-// Simple demo: animate a value in the console between 0 and 100.
-let t = 0;
-let dir = 1;
+export async function loadOpenCVOnce() {
+  if (window.cv && typeof window.cv.Mat === 'function') { setCvReady(true); return; }
+  if (cvLoadPromise) return cvLoadPromise;
 
-const tick = () => {
-  t += 0.02 * dir;
-  if (t >= 1 || t <= 0) dir *= -1;
-  const value = Math.round(lerp(0, 100, t));
-  const clamped = clamp(value, 10, 90);
-  const angle = toRadians(value);
-  console.log(`value=${value} clamped=${clamped} rand=${randomInt(1,6)} angle(rad)=${angle.toFixed(2)}`);
-};
+  const sources = [
+    'https://docs.opencv.org/4.x/opencv.js',
+    'https://cdn.jsdelivr.net/gh/opencv/opencv@4.x/platforms/js/opencv.js'
+  ];
 
-// Use debounce to limit how often we log a "resized" message (browser only).
-const onResize = debounce(() => console.log('resized!'), 250);
-if (typeof window !== 'undefined') {
-  window.addEventListener('resize', onResize);
+  cvLoadPromise = new Promise((resolve, reject) => {
+    let idx = 0;
+    const tryNext = () => {
+      if (idx >= sources.length) { reject(new Error('Failed to load OpenCV.js')); return; }
+      const url = sources[idx++];
+      const s = document.createElement('script');
+      s.src = url; s.async = true;
+      s.onload = () => {
+        const wait = () => {
+          const ok = window.cv && typeof cv.Mat === 'function' && typeof cv.getPerspectiveTransform === 'function';
+          if (ok) { setCvReady(true); resolve(); } else setTimeout(wait, 25);
+        };
+        if (window.cv && typeof cv.onRuntimeInitialized === 'function') {
+          cv.onRuntimeInitialized = () => { setCvReady(true); resolve(); };
+          wait();
+        } else wait();
+      };
+      s.onerror = () => { console.warn('OpenCV load failed from', url); tryNext(); };
+      document.head.appendChild(s);
+    };
+    tryNext();
+  });
+
+  return cvLoadPromise;
 }
-
-// Start a tiny loop (works in Node and browser). Stop after ~3 seconds.
-const interval = setInterval(tick, 50);
-setTimeout(() => {
-  clearInterval(interval);
-  console.log('Demo done.');
-  if (typeof window !== 'undefined') {
-    window.removeEventListener('resize', onResize);
-  }
-}, 3000);
-
-// Export something just to show dual usage.
-export const demoRunning = true;
